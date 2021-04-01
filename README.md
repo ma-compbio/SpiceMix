@@ -49,7 +49,7 @@ In the root directory, two directories should be created and named `scripts` and
 For example, when there are two data sets, named `simulation 1` and `mouse primary visual cortex`, consisting of 3 and 2 FOVs, respectively, the file structure of Python scripts and input files should be as following:
 ```
 .
-├── scripts
+├── SpiceMix
 │   ├── main.py
 │   ├── readData.py
 │   └── ...
