@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from util import PyTorchDevice as device, PyTorchDType as dtype
+from util import PyTorchDType as dtype
 import sys, subprocess, os, struct, timeit
 import scipy
 from scipy.stats import truncnorm, multivariate_normal, mvn
@@ -10,8 +10,10 @@ from multiprocessing import Pool
 nCPU = 4
 
 n_cache = 2**14
-tLogGamma_cache = torch.tensor(loggamma(np.arange(1, n_cache)), dtype=dtype, device=device)
-tarange = torch.arange(n_cache, dtype=dtype, device=device)
+tLogGamma_cache = None
+tarange = None
+# tLogGamma_cache = torch.tensor(loggamma(np.arange(1, n_cache)), dtype=dtype, device=PyTorch_device)
+# tarange = torch.arange(n_cache, dtype=dtype, device=PyTorch_device)
 
 def sampleFromSimplex(n, D, seed=None):
 	# should restore seed
@@ -51,16 +53,16 @@ def sampleFromSuperellipsoid(n, D, vec, seed=None):
 def sampleFromSimplexPyTorch(n, D, seed=None):
 	seed = 0
 	if seed is not None: torch.manual_seed(seed)
-	x = torch.rand([n, D], device=device, dtype=dtype).add_(1e-20)
+	x = torch.rand([n, D], device=PyTorch_device, dtype=dtype).add_(1e-20)
 	x.log_()
 	x.div_(x.sum(1, keepdim=True))
 	return x
 
 def sampleFromTruncatedHyperballPyTorch(n, D, center, l, seed=None):
 	if seed is not None: torch.manual_seed(seed)
-	m = torch.distributions.normal.Normal(torch.tensor(0., device=device), torch.tensor(1., device=device))
-	m_uniform = torch.distributions.uniform.Uniform(torch.tensor(0., device=device), torch.tensor(1., device=device))
-	ret = torch.zeros([n, D], dtype=dtype, device=device)
+	m = torch.distributions.normal.Normal(torch.tensor(0., device=PyTorch_device), torch.tensor(1., device=PyTorch_device))
+	m_uniform = torch.distributions.uniform.Uniform(torch.tensor(0., device=PyTorch_device), torch.tensor(1., device=PyTorch_device))
+	ret = torch.zeros([n, D], dtype=dtype, device=PyTorch_device)
 	zero_dim = (center < 1e-5)[None]
 	cnt = 0
 	nbatch = 0
@@ -90,9 +92,9 @@ def sampleFromTruncatedHyperballPyTorch(n, D, center, l, seed=None):
 def sampleFromTruncatedSuperellipsoidPyTorch(n, D, center, vec, seed=None):
 	if seed is not None: torch.manual_seed(seed)
 	# Below is slow !!!
-	m = torch.distributions.normal.Normal(torch.tensor(0., device=device), torch.tensor(1., device=device))
-	m_uniform = torch.distributions.uniform.Uniform(torch.tensor(0., device=device), torch.tensor(1., device=device))
-	ret = torch.zeros([n, D], dtype=dtype, device=device)
+	m = torch.distributions.normal.Normal(torch.tensor(0., device=PyTorch_device), torch.tensor(1., device=PyTorch_device))
+	m_uniform = torch.distributions.uniform.Uniform(torch.tensor(0., device=PyTorch_device), torch.tensor(1., device=PyTorch_device))
+	ret = torch.zeros([n, D], dtype=dtype, device=PyTorch_device)
 	cnt = 0
 	nbatch = 0
 	while cnt < n:
@@ -358,10 +360,10 @@ def estimateMomentsForTruncatedMultivariateGaussianCPPBatch(n, D, means, cov, co
 		time_start = timeit.default_timer()
 		tlogZ, tvlogZ = estimateLogPartitionFunctionForTruncatedMultivariateGaussianPyTorch(
 			D,
-			torch.tensor(means[idx][:, None], dtype=dtype, device=device),
-			torch.tensor(cov_U.T[None], dtype=dtype, device=device),
-			torch.tensor(prec_U.T[None], dtype=dtype, device=device),
-			torch.tensor(m1[idx][:, None], dtype=dtype, device=device),
+			torch.tensor(means[idx][:, None], dtype=dtype, device=PyTorch_device),
+			torch.tensor(cov_U.T[None], dtype=dtype, device=PyTorch_device),
+			torch.tensor(prec_U.T[None], dtype=dtype, device=PyTorch_device),
+			torch.tensor(m1[idx][:, None], dtype=dtype, device=PyTorch_device),
 		)
 		tlogZ = tlogZ.squeeze(-1)
 		tvlogZ = tvlogZ.squeeze(-1)
@@ -388,8 +390,8 @@ def estimateLogPartitionFunctionForTruncatedMultivariateGaussianPyTorch(K, tmean
 
 	nround = 1e3 * K
 	nsample = 2**10
-	tsample = torch.empty([nsample, K], dtype=dtype, device=device)		# (n, K)
-	tlogZ = torch.zeros([N, M], dtype=dtype, device=device)	# (N, M)
+	tsample = torch.empty([nsample, K], dtype=dtype, device=PyTorch_device)		# (n, K)
+	tlogZ = torch.zeros([N, M], dtype=dtype, device=PyTorch_device)	# (N, M)
 	tvlogZ = torch.zeros_like(tlogZ)
 
 	# """
@@ -401,12 +403,12 @@ def estimateLogPartitionFunctionForTruncatedMultivariateGaussianPyTorch(K, tmean
 	# 	print(np.array2string(m, formatter={'all': '{:.2e}'.format}))
 	# 	print(np.array2string(1/l, formatter={'all': '{:.2e}'.format}))
 	for _ in range(int(nround)):
-		torch.rand(*tsample.shape, out=tsample, dtype=dtype, device=device)
+		torch.rand(*tsample.shape, out=tsample, dtype=dtype, device=PyTorch_device)
 		tsample.log_().neg_()	# (n, K)
 		chunk_size = int(2**30 / (M*nsample*K))
 		for tmeanc, tlambdac, tlogZc, tvlogZc in zip(tmean.split(chunk_size, 0), tlambda.split(chunk_size, 0), tlogZ.split(chunk_size, 0), tvlogZ.split(chunk_size, 0)):
 			Nc = len(tmeanc)
-			t = torch.empty([Nc, M, nsample, K], dtype=dtype, device=device)
+			t = torch.empty([Nc, M, nsample, K], dtype=dtype, device=PyTorch_device)
 			t.copy_(tsample)
 			e = t.sum(-1)
 			t.div_(tlambdac[:, :, None, :])
@@ -441,8 +443,8 @@ def estimateLogPartitionFunctionForTruncatedMultivariateGaussianPyTorch(K, tmean
 			lp[:] = scipy.stats.gamma.logpdf(s, a=k, scale=theta)
 		sample_np = sample_np.reshape(N, M, K, nsample).transpose(0, 1, 3, 2)
 		logpdf_np = logpdf_np.reshape(N, M, K, nsample).sum(2)
-		tsample = torch.tensor(sample_np, dtype=dtype, device=device)
-		e = torch.tensor(logpdf_np, dtype=dtype, device=device).neg_()
+		tsample = torch.tensor(sample_np, dtype=dtype, device=PyTorch_device)
+		e = torch.tensor(logpdf_np, dtype=dtype, device=PyTorch_device).neg_()
 		tsample.sub_(tmean[:, :, None, :])
 		e.add_((tsample @ tprec_L[None]).pow_(2).sum(-1).div_(-2))
 		e_max = e.max(-1, keepdim=True)[0]
@@ -469,9 +471,9 @@ def estimatePartitionFunctionForTruncatedMultivariateGaussianPyTorch(K, tmean, t
 
 	nround = 1e3 * K
 	nsample = 2**10
-	tsample = torch.empty([nsample, K], dtype=dtype, device=device)	# (n, K)
-	# tmean = torch.tensor(mean, dtype=dtype, device=device)	# (N, M, K)
-	tZ = torch.zeros([N, M], dtype=dtype, device=device)	# (N, M)
+	tsample = torch.empty([nsample, K], dtype=dtype, device=PyTorch_device)	# (n, K)
+	# tmean = torch.tensor(mean, dtype=dtype, device=PyTorch_device)	# (N, M, K)
+	tZ = torch.zeros([N, M], dtype=dtype, device=PyTorch_device)	# (N, M)
 
 	for _ in range(int(nround)):
 		tsample.normal_()	# (n, K)
@@ -518,7 +520,7 @@ def estimateMomentsForTruncatedMultivariateGaussianPyTorch(K, cov, means, func_a
 		# multivariate_normal(mean=np.zeros(K), cov=cov).cdf(mean)
 		# [multivariate_normal(mean=-m, cov=cov).cdf(np.zeros(K)) for m in mean]
 
-		arr = torch.tensor(arr, dtype=dtype, device=device)
+		arr = torch.tensor(arr, dtype=dtype, device=PyTorch_device)
 		return arr
 
 	# covariance matrix is shared
@@ -550,7 +552,7 @@ def estimateMomentsForTruncatedMultivariateGaussianPyTorch(K, cov, means, func_a
 	del idx
 	assert next(cov2_iter, None) is None
 	del cov2_iter
-	tcov, tcov1, tcov2 = [torch.tensor(_, dtype=dtype, device=device) for _ in [cov, cov1, cov2]]
+	tcov, tcov1, tcov2 = [torch.tensor(_, dtype=dtype, device=PyTorch_device) for _ in [cov, cov1, cov2]]
 	tcov0 = tcov
 	# tcov_2, tcov1_2, tcov2_2 = [torch.cholesky(_, upper=True) for _ in [tcov, tcov1, tcov2]]
 	# tcov0_2 = tcov_2
@@ -601,7 +603,7 @@ def estimateMomentsForTruncatedMultivariateGaussianPyTorch(K, cov, means, func_a
 		mean2 = mean2.transpose(1, 0, 2)
 
 		# using PyTorch
-		# tmean2 = torch.tensor(mean2, dtype=dtype, device=device)
+		# tmean2 = torch.tensor(mean2, dtype=dtype, device=PyTorch_device)
 		# del mean2
 		# t2_ = estimatePartitionFunctionForTruncatedMultivariateGaussianPyTorch(K-2, tmean2, tcov2_2)	# (N, K*(K-1)/2)
 		# del tmean2
@@ -610,14 +612,14 @@ def estimateMomentsForTruncatedMultivariateGaussianPyTorch(K, cov, means, func_a
 		t2_ = estimatePartitionFunction(K-2, mean2, cov2)
 		del mean2
 		# I_0^{n-2}		square matrix, zero diagonal				shape: (N, K, K-1)
-		t2 = torch.zeros([N, K, K-1], dtype=dtype, device=device)
+		t2 = torch.zeros([N, K, K-1], dtype=dtype, device=PyTorch_device)
 		# I_0^{n-2}		fill upper triangular part					shape: (N, K, K-1)
 		t2[:, row_idx, col_idx-1] = t2_
 		# I_0^{n-2}		fill lower triangular part					shape: (N, K, K-1)
 		t2[:, col_idx, row_idx] = t2_
 		del t2_
 		# mu(-i) _j _ {row: i, column: j!=i}						shape: (N, K, K-1)
-		tmean1 = torch.tensor(mean1, dtype=dtype, device=device)
+		tmean1 = torch.tensor(mean1, dtype=dtype, device=PyTorch_device)
 		# t1 = estimatePartitionFunctionForTruncatedMultivariateGaussianPyTorch(K-1, tmean1, tcov1_2)	# I_0^{n-1} (N, K)
 		# Sigma(-i) _jj _ {row: i, column: j!=i}					shape: (1, K, K-1)
 		tc = tcov1.view(K, -1)[None, :, ::K]	# (K, K-1, K-1) -> (K, (K-1)**2) -> (K, K-1) diagonal
@@ -634,7 +636,7 @@ def estimateMomentsForTruncatedMultivariateGaussianPyTorch(K, cov, means, func_a
 		# [ I^{n-1}_ej -i ] _ {row: i, column: j}	the first part	shape: (N, K, K-1)
 		t2.addcmul_(t1[:, :, None], tmean1)
 		# mu														shape: (N, K)
-		tmean0 = torch.tensor(mean, dtype=dtype, device=device)
+		tmean0 = torch.tensor(mean, dtype=dtype, device=PyTorch_device)
 		# I_0^n														shape: (N)
 		# t0 = estimatePartitionFunctionForTruncatedMultivariateGaussianPyTorch(K, tmean0[:, None, :], tcov0_2[None]).squeeze(1)	# I_0^n (N, )
 		t0 = estimatePartitionFunction(K, mean0[:, None, :], cov0[None]).squeeze(1)
@@ -650,7 +652,7 @@ def estimateMomentsForTruncatedMultivariateGaussianPyTorch(K, cov, means, func_a
 		# [ I^n_ei ]	the first part								shape: (N, K)
 		t1.addcmul_(t0[:, None], tmean0)
 		# [ d^n_ei j} ]												shape: (N, K, K)
-		t2_ = torch.zeros([N, K, K], dtype=dtype, device=device)
+		t2_ = torch.zeros([N, K, K], dtype=dtype, device=PyTorch_device)
 		t2_[:, row_idx, col_idx] = t2[:, col_idx, row_idx]
 		t2_[:, col_idx, row_idx] = t2[:, row_idx, col_idx-1]
 		t2 = t2_
@@ -693,7 +695,7 @@ def integrateOfExponentialOverSimplexRecurrence(teta, grad=1., requires_grad=Fal
 	# tarr[:, J:].sub_( t.exp().mul_(tarr[:, [J-1]]) ).div_(t.neg_())
 
 	if requires_grad:
-		tarr = torch.ones([N, D, D], dtype=dtype, device=device)
+		tarr = torch.ones([N, D, D], dtype=dtype, device=PyTorch_device)
 
 		for J in range(1, D):
 			t = teta[:, J:] - teta[:, [J-1]]
@@ -705,7 +707,7 @@ def integrateOfExponentialOverSimplexRecurrence(teta, grad=1., requires_grad=Fal
 		tret = tarr[:, -1, -1].mul(teta[:, -1].neg().exp())
 		tret = tret.log()
 	else:
-		tarr = torch.ones([N, D, D], dtype=dtype, device=device)
+		tarr = torch.ones([N, D, D], dtype=dtype, device=PyTorch_device)
 
 		for J in range(1, D):
 			t = teta[:, J:] - teta[:, [J-1]]
@@ -748,7 +750,7 @@ def integrateOfExponentialOverSimplexRecurrence(teta, grad=1., requires_grad=Fal
 	return tret
 
 def integrateOfExponentialOverSimplexInduction(teta, grad=None, requires_grad=False):
-	if grad is None: grad = torch.tensor([1.], dtype=dtype, device=device)
+	if grad is None: grad = torch.tensor([1.], dtype=dtype, device=PyTorch_device)
 	N, D = teta.shape
 	# tarr[:, J:].sub_( t.exp().mul_(tarr[:, [J-1]]) ).div_(t.neg_())
 
@@ -762,7 +764,7 @@ def integrateOfExponentialOverSimplexInduction(teta, grad=None, requires_grad=Fa
 
 	if requires_grad:
 		"""
-		A = torch.empty([N, D], dtype=dtype, device=device)
+		A = torch.empty([N, D], dtype=dtype, device=PyTorch_device)
 		signs = torch.empty_like(A)
 		for k in range(D):
 			t = teta - teta[:, [k]]
@@ -783,7 +785,7 @@ def integrateOfExponentialOverSimplexInduction(teta, grad=None, requires_grad=Fa
 		for teta in tetas.split(chunk_size, 0):
 		# tret = trets
 		# teta = tetas
-			A = torch.empty([len(teta), D], dtype=dtype, device=device)
+			A = torch.empty([len(teta), D], dtype=dtype, device=PyTorch_device)
 			Asign = torch.empty_like(A)
 			for k in range(D):
 				t = teta - teta[:, [k]]
@@ -812,7 +814,7 @@ def integrateOfExponentialOverSimplexInduction(teta, grad=None, requires_grad=Fa
 		tret = torch.cat(trets)
 	else:
 		"""
-		A = torch.empty([N, D], dtype=dtype, device=device)
+		A = torch.empty([N, D], dtype=dtype, device=PyTorch_device)
 		Asign = torch.empty_like(A)
 		for k in range(D):
 			t = teta - teta[:, [k]]
@@ -850,11 +852,11 @@ def integrateOfExponentialOverSimplexInduction(teta, grad=None, requires_grad=Fa
 		teta.add_(1e-4, rank)
 		# print(teta)
 		tetas = teta
-		trets = torch.empty(len(teta), dtype=dtype, device=device)
+		trets = torch.empty(len(teta), dtype=dtype, device=PyTorch_device)
 		tidx = tarange[D-1:D+nterm-1]
 		tlg = tLogGamma_cache[D-1: D+nterm-1]
 		for tret, teta, teta_grad in zip(trets.split(chunk_size, 0), tetas.split(chunk_size, 0), tetas.grad.split(chunk_size, 0)):
-			A = torch.empty([len(teta), D], dtype=dtype, device=device)
+			A = torch.empty([len(teta), D], dtype=dtype, device=PyTorch_device)
 			Asign = torch.empty_like(A)
 			for k in range(D):
 				t = teta - teta[:, [k]]
@@ -923,9 +925,15 @@ def integrateOfExponentialOverSimplexInduction(teta, grad=None, requires_grad=Fa
 
 	return tret
 
-def integrateOfExponentialOverSimplexInduction2(teta, grad=None, requires_grad=False):
-	if grad is None: grad = torch.tensor([1.], dtype=dtype, device=device)
+def integrateOfExponentialOverSimplexInduction2(teta, grad=None, requires_grad=False, PyTorch_device='cpu'):
+	if grad is None: grad = torch.tensor([1.], dtype=dtype, device=PyTorch_device)
 	N, D = teta.shape
+
+	global tLogGamma_cache, tarange
+	if tLogGamma_cache is None:
+		tLogGamma_cache = torch.tensor(loggamma(np.arange(1, n_cache)), dtype=dtype, device=PyTorch_device)
+	if tarange is None:
+		tarange = torch.arange(n_cache, dtype=dtype, device=PyTorch_device)
 
 	t_eta_offset = teta.max(-1, keepdim=True)[0] + 1e-5
 	# nterm = 256
@@ -939,8 +947,8 @@ def integrateOfExponentialOverSimplexInduction2(teta, grad=None, requires_grad=F
 		teta = teta.neg()
 		# teta = teta.sort()[0]
 
-		f = torch.zeros([N, D], dtype=dtype, device=device)
-		tret = torch.zeros([nterm, N], dtype=dtype, device=device)
+		f = torch.zeros([N, D], dtype=dtype, device=PyTorch_device)
+		tret = torch.zeros([nterm, N], dtype=dtype, device=PyTorch_device)
 
 		for m in range(1, nterm):
 			f = f + teta.log()
@@ -954,15 +962,15 @@ def integrateOfExponentialOverSimplexInduction2(teta, grad=None, requires_grad=F
 	else:
 		teta.sub_(t_eta_offset).neg_()
 		tetas = teta
-		trets = torch.empty(N, dtype=dtype, device=device)
+		trets = torch.empty(N, dtype=dtype, device=PyTorch_device)
 		chunk_size = 32
 		for teta, teta_grad, tretc in zip(tetas.split(chunk_size, 0), teta.grad.split(chunk_size, 0), trets.split(chunk_size, 0)):
 			N = len(teta)
 			teta_log = teta.log()
-			tret = torch.zeros([nterm, N], dtype=dtype, device=device)
-			tgrad = torch.full([nterm, N, D], -np.inf, dtype=dtype, device=device)
-			f = torch.zeros([N, D], dtype=dtype, device=device)
-			g = torch.full([N, D, D], -np.inf, dtype=dtype, device=device)
+			tret = torch.zeros([nterm, N], dtype=dtype, device=PyTorch_device)
+			tgrad = torch.full([nterm, N, D], -np.inf, dtype=dtype, device=PyTorch_device)
+			f = torch.zeros([N, D], dtype=dtype, device=PyTorch_device)
+			g = torch.full([N, D, D], -np.inf, dtype=dtype, device=PyTorch_device)
 			for m in range(1, nterm):
 				g.add_(teta_log[:, None, :])
 				gd = g.view(N, D**2)[:, ::D+1]
@@ -995,7 +1003,7 @@ def integrateOfExponentialOverSimplexInduction2(teta, grad=None, requires_grad=F
 
 
 def integrateOfExponentialOverSimplexSampling(teta, grad=None, requires_grad=False, seed=None):
-	# if grad is None: grad = torch.tensor([1.], dtype=dtype, device=device)
+	# if grad is None: grad = torch.tensor([1.], dtype=dtype, device=PyTorch_device)
 	N, D = teta.shape
 
 	# teta_offset = teta.min(1, keepdim=True)[0]
@@ -1007,7 +1015,7 @@ def integrateOfExponentialOverSimplexSampling(teta, grad=None, requires_grad=Fal
 
 	if requires_grad:
 		# teta = teta - teta_offset
-		tlogZ = torch.zeros(N, dtype=dtype, device=device)
+		tlogZ = torch.zeros(N, dtype=dtype, device=PyTorch_device)
 		for _ in range(nround):
 			if seed is not None: seed = seed*nround+_
 			t = teta.neg().matmul(sampleFromSimplexPyTorch(n, D, seed=seed).t())
@@ -1019,7 +1027,7 @@ def integrateOfExponentialOverSimplexSampling(teta, grad=None, requires_grad=Fal
 		tlogZ = tlogZ - loggamma_D
 		# tlogZ = tlogZ - teta_offset.squeeze(1)
 	else:
-		tlogZ = torch.zeros(N, dtype=dtype, device=device)
+		tlogZ = torch.zeros(N, dtype=dtype, device=PyTorch_device)
 		tgrad = torch.zeros_like(teta)
 
 		# teta.sub_(teta_offset)
@@ -1077,9 +1085,9 @@ def test_dist():
 	# x = sampleFromHyperball(10000, 2, 10)
 	# x = sampleFromSuperellipsoid(10000, 2, np.array([[1, 3], [1, -3]]))
 	# x = sampleFromSimplexPyTorch(10000, 3).cpu().data.numpy()
-	# x = sampleFromTruncatedSuperellipsoidPyTorch(100000, 2, torch.tensor([0., 0.,], dtype=dtype, device=device), torch.tensor([[1., 100.], [1., -100.]], dtype=dtype, device=device)).cpu().data.numpy()
-	# D = 20; x = sampleFromTruncatedHyperballPyTorch(100000, D, torch.tensor([0.,]*D, dtype=dtype, device=device), 1).cpu().data.numpy()
-	# D, D_ = 20, 10; x = sampleFromTruncatedHyperballPyTorch(100000, D, torch.tensor([1e-4]*D_ + [0.,]*(D-D_), dtype=dtype, device=device), 1).cpu().data.numpy()
+	# x = sampleFromTruncatedSuperellipsoidPyTorch(100000, 2, torch.tensor([0., 0.,], dtype=dtype, device=PyTorch_device), torch.tensor([[1., 100.], [1., -100.]], dtype=dtype, device=PyTorch_device)).cpu().data.numpy()
+	# D = 20; x = sampleFromTruncatedHyperballPyTorch(100000, D, torch.tensor([0.,]*D, dtype=dtype, device=PyTorch_device), 1).cpu().data.numpy()
+	# D, D_ = 20, 10; x = sampleFromTruncatedHyperballPyTorch(100000, D, torch.tensor([1e-4]*D_ + [0.,]*(D-D_), dtype=dtype, device=PyTorch_device), 1).cpu().data.numpy()
 
 	"""
 	n, D = 1000, 2
@@ -1088,8 +1096,8 @@ def test_dist():
 	# cov = np.eye(2)
 	cov_2 = np.linalg.cholesky(cov)
 	print(cov_2)
-	# cov_2 = torch.tensor(cov_2, dtype=dtype, device=device)
-	x = sampleFromTruncatedMultivariateGaussianGibbsPyTorch(n, D, torch.tensor(mean, dtype=dtype, device=device), torch.tensor(cov_2, dtype=dtype, device=device)).cpu().data.numpy()
+	# cov_2 = torch.tensor(cov_2, dtype=dtype, device=PyTorch_device)
+	x = sampleFromTruncatedMultivariateGaussianGibbsPyTorch(n, D, torch.tensor(mean, dtype=dtype, device=PyTorch_device), torch.tensor(cov_2, dtype=dtype, device=PyTorch_device)).cpu().data.numpy()
 	# x = sampleFromTruncatedMultivariateGaussianCPP(n*100, D, mean, cov_2)
 	print(x[:, 0].min(), x[:, 1].min(), x.sum(1).min())
 	# """
@@ -1110,13 +1118,13 @@ def test_moments():
 		nsample = 2**10
 		# nround = 1000 * K
 		nround = 10 * K
-		t = torch.empty([nsample, K], dtype=dtype, device=device)
-		tcov = torch.tensor(cov, dtype=dtype, device=device)
+		t = torch.empty([nsample, K], dtype=dtype, device=PyTorch_device)
+		tcov = torch.tensor(cov, dtype=dtype, device=PyTorch_device)
 		tcov_2 = torch.cholesky(tcov, upper=True)
-		tmean = torch.tensor(mean, dtype=dtype, device=device)
-		tm0 = torch.zeros([N], dtype=dtype, device=device)
-		tm1 = torch.zeros([N, K], dtype=dtype, device=device)
-		tm2 = torch.zeros([N, K, K], dtype=dtype, device=device)
+		tmean = torch.tensor(mean, dtype=dtype, device=PyTorch_device)
+		tm0 = torch.zeros([N], dtype=dtype, device=PyTorch_device)
+		tm1 = torch.zeros([N, K], dtype=dtype, device=PyTorch_device)
+		tm2 = torch.zeros([N, K, K], dtype=dtype, device=PyTorch_device)
 		for n in range(int(nround)):
 			t.normal_()
 			x = (t @ tcov_2)[None, :, :] + tmean[:, None, :]	# (N, n, K)
@@ -1131,7 +1139,7 @@ def test_moments():
 		return (_.cpu().data.numpy() for _ in [tm0, tm1, tm2])
 
 	import timeit
-	t = torch.empty([10], dtype=dtype, device=device)
+	t = torch.empty([10], dtype=dtype, device=PyTorch_device)
 	torch.cuda.synchronize()
 	del t
 	N = 4
@@ -1279,8 +1287,8 @@ def test_moments():
 	print(np.abs(mvnun - tmvnun).max(0))
 
 	print('PyTorch ...', end='\t')
-	tmean = torch.tensor(mean, dtype=dtype, device=device)
-	tcov_2 = torch.tensor(cov, dtype=dtype, device=device)
+	tmean = torch.tensor(mean, dtype=dtype, device=PyTorch_device)
+	tcov_2 = torch.tensor(cov, dtype=dtype, device=PyTorch_device)
 	tcov_2 = torch.cholesky(tcov_2, upper=True)
 	torch.cuda.synchronize()
 	time_start = timeit.default_timer()
@@ -1299,14 +1307,14 @@ def test_moments():
 	print(np.abs(Z_pytorch - Z_pytorch_).max(0))
 
 	print('PyTorch ...', end='\t')
-	tmean = torch.tensor(mean, dtype=dtype, device=device)
-	tcov_2 = torch.tensor(cov, dtype=dtype, device=device)
+	tmean = torch.tensor(mean, dtype=dtype, device=PyTorch_device)
+	tcov_2 = torch.tensor(cov, dtype=dtype, device=PyTorch_device)
 	tcov_2 = torch.cholesky(tcov_2, upper=True)
-	tprec_2 = torch.tensor(prec, dtype=dtype, device=device)
+	tprec_2 = torch.tensor(prec, dtype=dtype, device=PyTorch_device)
 	tprec_2 = torch.cholesky(tprec_2, upper=True)
 	torch.cuda.synchronize()
 	time_start = timeit.default_timer()
-	Z_pytorch_log, vZ_pytorch_log = estimateLogPartitionFunctionForTruncatedMultivariateGaussianPyTorch(K, tmean[:, None], tcov_2[None].contiguous(), tprec_2[None].contiguous(), torch.tensor(cm1, dtype=dtype, device=device))
+	Z_pytorch_log, vZ_pytorch_log = estimateLogPartitionFunctionForTruncatedMultivariateGaussianPyTorch(K, tmean[:, None], tcov_2[None].contiguous(), tprec_2[None].contiguous(), torch.tensor(cm1, dtype=dtype, device=PyTorch_device))
 	Z_pytorch_log = Z_pytorch_log.squeeze(1)
 	vZ_pytorch_log = vZ_pytorch_log.squeeze(1)
 	torch.cuda.synchronize()
@@ -1315,7 +1323,7 @@ def test_moments():
 	print(timeit.default_timer() - time_start)
 	print('PyTorch parallel ...', end='\t')
 	time_start = timeit.default_timer()
-	Z_pytorch_log_, vZ_pytorch_log_ = estimateLogPartitionFunctionForTruncatedMultivariateGaussianPyTorch(K, tmean[:, None], tcov_2[None].contiguous(), tprec_2[None].contiguous(), torch.tensor(cm1, dtype=dtype, device=device))
+	Z_pytorch_log_, vZ_pytorch_log_ = estimateLogPartitionFunctionForTruncatedMultivariateGaussianPyTorch(K, tmean[:, None], tcov_2[None].contiguous(), tprec_2[None].contiguous(), torch.tensor(cm1, dtype=dtype, device=PyTorch_device))
 	Z_pytorch_log_ = Z_pytorch_log_.squeeze(1)
 	vZ_pytorch_log_ = vZ_pytorch_log_.squeeze(1)
 	torch.cuda.synchronize()
@@ -1430,7 +1438,7 @@ def test_IntegralOfExponentialOverSimplex():
 	t = np.sort(eta)
 	print(f'min diff η = {np.min(t[:, 1:]-t[:, :-1])}')
 	print(f'max range = {(t[:, -1] - t[:, 0]).max()}')
-	teta = torch.tensor(eta, dtype=dtype, device=device)
+	teta = torch.tensor(eta, dtype=dtype, device=PyTorch_device)
 
 	methods = [
 		integrateOfExponentialOverSimplexSampling,
@@ -1448,9 +1456,9 @@ def test_IntegralOfExponentialOverSimplex():
 		idx = np.random.permutation(K)
 		# idx = np.arange(K)
 		# print(idx)
-		teta_ = torch.tensor(eta[:, idx], dtype=dtype, device=device)
+		teta_ = torch.tensor(eta[:, idx], dtype=dtype, device=PyTorch_device)
 		teta_.grad = torch.zeros_like(teta_)
-		tgrad = torch.tensor([4], dtype=dtype, device=device)
+		tgrad = torch.tensor([4], dtype=dtype, device=PyTorch_device)
 
 		for method in methods:
 			teta_.grad.zero_()
@@ -1547,7 +1555,7 @@ if __name__ == '__main__':
 	# test_dist()
 	# test_sampleFromTruncatedMultivariateGaussianCPP_TruncatedNormal()
 	# test_moments()
-	# t = torch.tensor([[-.77, -.64, -.2]], dtype=dtype, device=device)
+	# t = torch.tensor([[-.77, -.64, -.2]], dtype=dtype, device=PyTorch_device)
 	# t.grad = torch.empty_like(t)
 	# print(integrateOfExponentialOverSimplexInduction2(t, grad=None, requires_grad=True))
 	# t.grad.zero_()

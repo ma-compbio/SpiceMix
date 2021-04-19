@@ -1,19 +1,53 @@
-import numpy as np
-import os, time, pickle, sys, psutil, resource
-import matplotlib.markers
-import torch
+import os, time, pickle, sys, psutil, resource, datetime, h5py, logging
 from collections import Iterable
 
-path2dir = os.path.dirname(__file__)
+import numpy as np
+import torch
+import networkx as nx
+
 
 pid = os.getpid()
 psutil_process = psutil.Process(pid)
+
+
+def print_datetime():
+	return datetime.datetime.now().strftime('[%Y/%m/%d %H:%M:%S]\t')
+
+
+def array2string(x):
+	return np.array2string(x, formatter={'all': '{:.2e}'.format})
+
+
+def parseSuffix(s):
+	return '' if s is None or s == '' else '_' + s
+
+
+def openH5File(filename, mode='a', num_attempts=5, duration=1):
+	for i in range(num_attempts):
+		try:
+			return h5py.File(filename, mode=mode)
+		except OSError as e:
+			logging.warning(str(e))
+			time.sleep(duration)
+	return None
+
+
+def encode4h5(v):
+	if isinstance(v, str): return v.encode('utf-8')
+	return v
+
+
+def parseIiter(g, iiter):
+	if iiter < 0: iiter += max(map(int, g.keys())) + 1
+	return iiter
+
 
 def zipTensors(*tensors):
 	return np.concatenate([
 		np.array(a).flatten()
 		for a in tensors
 	])
+
 
 def unzipTensors(arr, shapes):
 	assert np.all(arr.shape == (np.sum(list(map(np.prod, shapes))),))
@@ -24,54 +58,25 @@ def unzipTensors(arr, shapes):
 		arr = arr[size:]
 	return tensors
 
-def dataFolder(dataset): return os.path.join(path2dir, '..', 'data', dataset, 'files')
 
 # PyTorchDType = torch.float
 PyTorchDType = torch.double
-# force_cpu = True
-force_cpu = False
-if torch.cuda.is_available() and not force_cpu:
-	PyTorchDevice = torch.device('cuda')
-else:
-	PyTorchDevice = torch.device('cpu')
-	torch.set_num_threads(4)
 
-class Logger:
-	def __init__(self, dataset, tm=None):
-		if tm is None: tm = time.strftime('%Y-%m-%d-%H-%M-%S') + '_' + str(os.getpid())
-		self.folder = os.path.join(path2dir, '..', 'data', dataset, 'logs', tm)
-		os.makedirs(self.folder, exist_ok=True)
-		print(f'log folder = {self.folder}')
-	def log(self, filename, x):
-		with open(os.path.join(self.folder, filename + '.pkl'), 'wb') as f: pickle.dump(x, f, protocol=2)
 
-def loadLog(dataset, tm, limit=None):
-	H_Theta_Q = [[], [], []]
-	if isinstance(limit, list): limit = iter(limit)
-	if isinstance(limit, Iterable): i = next(limit, None)
-	else: i = 0
-	while True:
-		stop_flag = False
-
-		for a, text in zip(H_Theta_Q, ['H', 'Theta', 'Q']):
-			filename = os.path.join(path2dir, '..', 'data', dataset, 'logs', tm, f'{text}_{i}.pkl')
-
-			if os.path.exists(filename):
-				# print('loading file {}'.format(filename))
-				with open(filename, 'rb') as f: a.append(pickle.load(f))
-			else:
-				stop_flag = True
-
-			if stop_flag: break
-
-		if isinstance(limit, Iterable):
-			i = next(limit, None)
-			if i is None: stop_flag = True
-		elif isinstance(limit, int):
-			i += 1
-			if i > limit: stop_flag = True
-		else:
-			i += 1
-
-		if stop_flag: break
-	return tuple(H_Theta_Q)
+def calcPermutation(sim):
+	assert sim.ndim == 2
+	B = nx.Graph()
+	B.add_nodes_from([f'o{i}' for i in range(sim.shape[0])], bipartite=0)
+	B.add_nodes_from([f't{i}' for i in range(sim.shape[1])], bipartite=1)
+	B.add_edges_from([
+		(f'o{i}', f't{j}', {'weight': sim[i, j]})
+		for i in range(sim.shape[0]) for j in range(sim.shape[1])
+	])
+	assert nx.is_bipartite(B)
+	matching = nx.max_weight_matching(B, maxcardinality=True)
+	assert len(set(__ for _ in matching for __ in _)) == 2*min(sim.shape)
+	matching = [_ if _[0][0] == 'o' else _[::-1] for _ in matching]
+	matching = [tuple(int(__[1:]) for __ in _) for _ in matching]
+	matching = sorted(matching, key=lambda x: x[1])
+	perm, index = map(np.array, zip(*matching))
+	return perm, index

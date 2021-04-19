@@ -1,160 +1,18 @@
-from util import Logger, dataFolder, psutil_process
+import os, sys, time, itertools, resource, gc, argparse, re, logging
+from util import psutil_process, print_datetime
+
 import numpy as np
-from readData import readDataSet
-import os, sys, time, itertools, resource, gc, argparse
-from estimateParameters import estimateParameters as estimateParameters
-from estimateWeights import estimateWeights
-import initializeState
 import torch
 
-def main(dataset, K, betas, dataset_parameter, logger, modelSpec, max_iter, **kwargs):
-	print('dataset = {}'.format(dataset))
-	print('K = {}'.format(K))
-	print('betas = {}'.format(betas))
+from Model import Model
 
-	YTs, Es, Es_empty = readDataSet(dataset, **dataset_parameter)
-	Ns, Gs = zip(*[YT.shape for YT in YTs])
-	GG = max(Gs)
-	YTs = [G / GG * K * YT / YT.sum(1).mean() for YT, G in zip(YTs, Gs)]
-
-	print('sizes of Es = {}, # of edges = {}'.format(list(map(len, Es)), [sum(map(len, E)) for E in Es]))
-
-	if modelSpec['dropout_str'] == 'origin':
-		YT_valids = [np.broadcast_to(True, YT.shape) for YT in YTs]
-	elif modelSpec['dropout_str'] == 'pass':
-		YT_valids = [YT != 0 for YT in YTs]
-	else: assert False
-
-	for k, v in modelSpec.items():
-		print(f'{k}\t=\t{v}')
-
-	print('begin!')
-	sys.stdout.flush()
-
-	O = (K, YTs, YT_valids, Es, Es_empty, betas)
-	# prior_x_strs = ['Gaussian'] * len(YTs)
-	# prior_x_strs = ['Truncated Gaussian'] * len(YTs)
-	# prior_x_strs = ['Exponential shared'] * len(YTs)
-	prior_x_strs = ['Exponential shared fixed'] * len(YTs)
-	# prior_x_strs = ['Exponential'] * len(YTs)
-	print(f"prior_x_str = {'	'.join(prior_x_strs)}")
-
-	H, Theta = initializeState.initializeByKMean(
-	# H, Theta = initializeState.initializeByRandomSpatial(
-		O, modelSpec, **modelSpec, prior_x_strs=prior_x_strs,
-	)
-	if logger:
-		logger.log('H_{:d}'.format(0), H)
-		logger.log('Theta_{:d}'.format(0), Theta)
-	else:
-		# """
-		M, sigma_yx_invs, Sigma_x_inv, delta_x = map(np.array, Theta[:-1])
-		print('M = \n{}'.format(M[:4]))
-		print('σ_yx_inv = {}'	.format(np.array2string(sigma_yx_invs	, formatter={'all': '{:.2e}'.format})))
-		print('Σ_x_inv = \n{}'	.format(np.array2string(Sigma_x_inv		, formatter={'all': '{:.2e}'.format})))
-		print('δ_x = {}'		.format(np.array2string(delta_x			, formatter={'all': '{:.2e}'.format})))
-		del M, sigma_yx_invs, Sigma_x_inv, delta_x
-		prior_xs = Theta[-1]
-		for prior_x in prior_xs:
-			if prior_x[0] in ['Truncated Gaussian', 'Gaussian']:
-				mu_x, sigma_x_inv = map(np.array, prior_x[1:])
-				print('μ_x = {}'		.format(np.array2string(mu_x		, formatter={'all': '{:.2e}'.format})), end='\t')
-				print('σ_xInv = {}'		.format(np.array2string(sigma_x_inv	, formatter={'all': '{:.2e}'.format})), end='\n')
-				del mu_x, sigma_x_inv
-			elif prior_x[0] in ['Exponential', 'Exponential shared', 'Exponential shared fixed']:
-				lambda_x,  = map(np.array, prior_x[1:])
-				print('lambda_x = {}'	.format(np.array2string(lambda_x, formatter={'all': '{:.2e}'.format})))
-				del lambda_x
-			else:
-				assert False
-			del prior_x
-		del prior_xs
-		# """
-		pass
-
-
-	torch.cuda.empty_cache()
-
-	last_Q = np.nan
-	# best_Q, best_iter = np.nan, -1
-
-	print(f'Current RAM usage (%) is {psutil_process.memory_percent()}')
-	print(f'Peak RAM usage till now is {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss}')
-
-	for iiter in range(max_iter):
-		iiter += 1
-		modelSpec['iiter'] = iiter
-
-		H = estimateWeights(O, H, Theta, modelSpec, **modelSpec)
-		print(f'Current RAM usage (%) is {psutil_process.memory_percent()}')
-		print(f'Peak RAM usage till now is {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss}')
-		if logger:
-			logger.log(f'H_{iiter}', H)
-			pass
-		else:
-			pass
-
-		Theta, Q = estimateParameters(
-			O, H, Theta, modelSpec,
-			**modelSpec
-		)
-		print(f'Current RAM usage (%) is {psutil_process.memory_percent()}')
-		print(f'Peak RAM usage till now is {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss}')
-		if logger:
-			logger.log(f'Theta_{iiter:d}', Theta)
-			logger.log(f'Q_{iiter:d}', Q)
-		else:
-			# """
-			M, sigma_yx_invs, Sigma_x_inv, delta_x = map(np.array, Theta[:-1])
-			print('M = \n{}'.format(M[:4]))
-			print('σ_yx_inv = {}'.format(np.array2string(sigma_yx_invs, formatter={'all': '{:.2e}'.format})))
-			print('Σ_x_inv = \n{}'.format(np.array2string(Sigma_x_inv	, formatter={'all': '{:.2e}'.format})))
-			print('δ_x = {}'		.format(np.array2string(delta_x			, formatter={'all': '{:.2e}'.format})))
-			del M, sigma_yx_invs, Sigma_x_inv, delta_x
-			prior_xs = Theta[-1]
-			for prior_x in prior_xs:
-				if prior_x[0] in ['Truncated Gaussian', 'Gaussian']:
-					mu_x, sigma_x_inv = map(np.array, prior_x[1:])
-					print('μ_x = {}'		.format(np.array2string(mu_x		, formatter={'all': '{:.2e}'.format})), end='\t')
-					print('σ_xInv = {}'		.format(np.array2string(sigma_x_inv	, formatter={'all': '{:.2e}'.format})), end='\n')
-					del mu_x, sigma_x_inv
-				elif prior_x[0] in ['Exponential', 'Exponential shared', 'Exponential shared fixed']:
-					lambda_x,  = map(np.array, prior_x[1:])
-					print('lambda_x = {}'		.format(np.array2string(lambda_x	, formatter={'all': '{:.2e}'.format})))
-					del lambda_x
-				else:
-					assert False
-				del prior_x
-			del prior_xs
-			# """
-			pass
-
-		# stop_flag = False
-		# if not Q <= best_Q:
-		# 	best_Q, best_iter = Q, iiter
-		# if iiter > best_iter + 30:
-		# 	stop_flag = True
-
-		print('Q = {:.4f},\tdiff Q = {:.2e}'.format(Q, Q-last_Q), end='')
-		# if best_iter == iiter:
-		# 	print('\tbest')
-		# else:
-		# 	print()
-		print()
-
-		last_Q = Q
-
-		print('-'*10 + time.strftime(" %Y-%m-%d %H:%M:%S", time.localtime()) + '{:> 7d} '.format(iiter) + '-'*10)
-
-		# if stop_flag:
-		# 	break
 
 def parse_arguments():
 	parser = argparse.ArgumentParser()
 
 	# dataset
 	parser.add_argument(
-		'--dataset', type=str,
+		'--path2dataset', type=str,
 		help='name of the dataset, ../data/<dataset> should be a folder containing a subfolder named \'files\''
 	)
 	parser.add_argument(
@@ -170,7 +28,7 @@ def parse_arguments():
 		help='Suffix of the name of the file that contains expressions'
 	)
 	parser.add_argument(
-		'--exper_list', type=eval,
+		'--repli_list', type=eval,
 		help='list of names of the experiments, a Python expression, e.g., "[0,1,2]", "range(5)"'
 	)
 	parser.add_argument(
@@ -179,16 +37,32 @@ def parse_arguments():
 			 'a Python expression, e.g., "[True,True]", "[False,False,False]", "[True]*5"'
 	)
 
+	parser.add_argument('--random_seed', type=int, default=0)
+	parser.add_argument('--random_seed4kmeans', type=int, default=0)
+
 	# training & hyperparameters
 	parser.add_argument('--lambda_SigmaXInv', type=float, default=1e-4, help='Regularization on Sigma_x^{-1}')
-	parser.add_argument('--max_iter', type=int, default=200, help='Maximum number of outer optimization iteration')
+	parser.add_argument('--max_iter', type=int, default=500, help='Maximum number of outer optimization iteration')
 	parser.add_argument('--init_NMF_iter', type=int, default=10, help='2 * number of NMF iterations in initialization')
 	parser.add_argument(
-		'--beta', default=np.ones(1), type=np.array,
+		'--betas', default=np.ones(1), type=np.array,
 		help='Positive weights of the experiments; the sum will be normalized to 1; can be scalar (equal weight) or array-like'
 	)
 
-	parser.add_argument('--logger', default=False, action='store_true')
+	def parse_cuda(x):
+		if x == '-1' or x == 'cpu': return 'cpu'
+		if re.match('\d+$', x): return f'cuda:{x}'
+		if re.match('cuda:\d+$', x): return x
+	parser.add_argument(
+		'--device', type=parse_cuda, default='cpu', dest='PyTorch_device',
+		help="Which GPU to use. The value should be either string of form 'cuda_<GPU id>' "
+			 "or an integer denoting the GPU id. -1 or 'cpu' for cpu only",
+	)
+	parser.add_argument('--num_threads', type=int, default=1, help='Number of CPU threads')
+
+	parser.add_argument(
+		'--result_filename', default=None, help='The name of the h5 file to store results'
+	)
 
 	return parser.parse_args()
 
@@ -197,65 +71,48 @@ if __name__ == '__main__':
 
 	args = parse_arguments()
 
+	logging.basicConfig(level=logging.INFO)
+
 	print(f'pid = {os.getpid()}')
 
-	random_seed = 0
-	np.random.seed(random_seed)
-	print(f'random seed = {random_seed}')
+	np.random.seed(args.random_seed)
+	print(f'random seed = {args.random_seed}')
 
-	dataset = args.dataset
-	K = args.K
-	dataset_parameter = {
-		'neighbor_suffix': args.neighbor_suffix,
-		'expression_suffix': args.expression_suffix,
-		'exper_list': args.exper_list,
-		'use_spatial': args.use_spatial,
-	}
+	torch.set_num_threads(args.num_threads)
 
-	N = len(args.exper_list)
-	betas = np.broadcast_to(args.beta, [N]).copy().astype(np.float)
+	N = len(args.repli_list)
+	betas = np.broadcast_to(args.betas, [N]).copy().astype(np.float)
 	assert (betas>0).all()
 	betas /= betas.sum()
 
-	modelSpec = {}
-	for key in ['lambda_SigmaXInv', 'max_iter', 'init_NMF_iter']:
-		modelSpec[key] = getattr(args, key)
-
-	modelSpec['nsample4integral'] = 64
-
-	# modelSpec['X_sum2one'] = True		# not implemented
-	modelSpec['X_sum2one'] = False
-	modelSpec['M_sum2one'] = 'sum'
-	# modelSpec['M_sum2one'] = 'L1'		# not implemented
-	# modelSpec['M_sum2one'] = 'L2'		# not implemented
-	# modelSpec['M_sum2one'] = 'None'	# not implemented
-	# print('X_sum2one = {}'.format(X_sum2one))
-	assert not modelSpec['X_sum2one'] or modelSpec['M_sum2one'] == 'None'
-
-	# modelSpec['pairwise_potential_str'] = 'linear'
-	# modelSpec['pairwise_potential_str'] = 'linear w/ shift'
-	modelSpec['pairwise_potential_str'] = 'normalized'
-	# print(f'pairwise_potential = {pairwise_potential_str}')
-
-	# modelSpec['sigma_yx_inv_str'] = 'separate'
-	modelSpec['sigma_yx_inv_str'] = 'average'
-	# modelSpec['sigma_yx_inv_str'] = 'average 1'
-	# print(f'sigma_yx_inv_str = {sigma_yx_inv_str}')
-
-	modelSpec['dropout_str'] = 'origin'
-	# modelSpec['dropout_str'] = 'pass'
-
-	if args.logger:
-		logger = Logger(dataset=dataset)
-	else:
-		logger = None
-
-	main(
-		dataset=dataset,
-		K=K,
-		betas=betas,
-		dataset_parameter=dataset_parameter,
-		modelSpec=modelSpec,
-		logger=logger,
-		**modelSpec,
+	model = Model(
+		PyTorch_device=args.PyTorch_device, path2dataset=args.path2dataset, repli_list=args.repli_list,
+		use_spatial=args.use_spatial, neighbor_suffix=args.neighbor_suffix, expression_suffix=args.expression_suffix,
+		K=args.K, lambda_SigmaXInv=args.lambda_SigmaXInv, betas=betas,
+		prior_x_modes=np.array(['Exponential shared fixed']*len(args.repli_list)),
+		result_filename=args.result_filename,
 	)
+
+	# prior_x_strs = ['Gaussian'] * len(YTs)
+	# prior_x_strs = ['Truncated Gaussian'] * len(YTs)
+	# prior_x_strs = ['Exponential shared'] * len(YTs)
+	# prior_x_strs = ['Exponential shared fixed'] * len(YTs)
+	# prior_x_strs = ['Exponential'] * len(YTs)
+	# print(f"prior_x_str = {'	'.join(prior_x_strs)}")
+
+	model.initialize(
+		random_seed4kmeans=args.random_seed4kmeans, num_NMF_iter=args.init_NMF_iter,
+	)
+
+	torch.cuda.empty_cache()
+	last_Q = np.nan
+	max_iter = args.max_iter
+
+	for iiter in range(1, max_iter+1):
+		logging.info(f'{print_datetime()}Iteration {iiter} begins')
+
+		model.estimateWeights(iiter=iiter)
+		Q = model.estimateParameters(iiter=iiter)
+
+		logging.info(f'{print_datetime()}Q = {Q:.4f}\tdiff Q = {Q-last_Q:.4e}')
+		last_Q = Q
