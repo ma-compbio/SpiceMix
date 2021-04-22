@@ -4,7 +4,7 @@
 
 SpiceMix is an unsupervised tool for analyzing data of the spatial transcriptome. SpiceMix models the observed expression of genes within a cell as a mixture of latent factors. These factors are assumed to have some spatial affinity between neighboring cells. The factors and affinities are not known a priori, but are learned by SpiceMix directly from the data, by an alternating optimization method that seeks to maximize their posterior probability given the observed gene expression. In this way, SpiceMix learns a more expressive representation of the identity of cells from their spatial transcriptome data than other available methods. 
 
-SpiceMix can be applied to any type spatial transcriptomics data, including MERFISH, seqFISH, and HDST.
+SpiceMix can be applied to any type of spatial transcriptomics data, including MERFISH, seqFISH, HDST, and Slide-seq.
 
 ## Requirement
 
@@ -22,12 +22,12 @@ All code is contained within the SpiceMix folder. The script `main.py` runs the 
 
 ### Step 1: preparing input files
 
-All files for one run of SpiceMix must be put into one directory. For each FOV with name `<FOV>` of `N` cells and `G` genes, the following two files stored as tab-delimited txt format are required for SpiceMix:
+All files for one run of SpiceMix must be put into one directory. SpiceMix can be applied to multiple samples (or replicates, or fields-of-view (FOV)) simultaneously, learning shared parameters across samples (we use the term FOV for an independent sample). For each FOV with name `<FOV>` of `N` cells and `G` genes, the following two files stored as tab-delimited txt format are required for SpiceMix:
 
 - `expression_<FOV>_<expr_suffix>.txt`, an N-by-G nonnegative-valued matrix of normalized single-cell expression profiles. In our paper, we applied the following steps of normalization to all data sets:
-  - Filter out genes with low nonzero rates and/or cells that express a few genes
+  - Filter out genes with low nonzero rates and/or cells that express only a few genes
   - Log transformation: Let <img src="https://render.githubusercontent.com/render/math?math=E_{ig}"> be the read counts of gene `g` in cell `i`, and the number of counts after log transformation is ![formula](https://render.githubusercontent.com/render/math?math=E'_{ig}=\log(1%2B10^4\cdot%20E_{ij}/\sum_{g'=1}^GE_{ig'}))
-- `neighborhood_<FOV>_<neigh_suffix>.txt`, a neighbor graph represented as a list of cell pairs, i.e., an `|E|`-by-2 integer-valued matrix. Cells are assigned with integer indices starting from 0 in the order that they appear in the expression profile file. We recommend the following two methods to generate the neighbor graph from cells' spatial coordinates:
+- `neighborhood_<FOV>_<neigh_suffix>.txt`, a neighbor graph represented as a list of cell pairs, i.e., an `|E|`-by-2 integer-valued matrix, where `|E|` is the number of edges in the graph. Cells are assigned with integer indices starting from 0 in the order that they appear in the expression profile file. We recommend the following two methods to generate the neighbor graph from cells' spatial coordinates:
   - K-nearest neighbor graph under Euclidean metric
   - Delaunay triangulation followed by discarding interactions between cells that are far away from each other
 
@@ -85,10 +85,10 @@ SpiceMix requires a few arguments to specify the input files and hyperparameters
 
 | params | type | description | example |
 |-|-|-|-|
-| -K                  | int | dimension of latent space | 20 |
+| -K                  | int | number of metagenes; equivalently, dimension of latent space | 20 |
 | --lambda_SigmaXInv  | float | regularization on Sigma_x^{-1} | 1e-4 |
 | --max_iter          | int | maximum number of coordinate optimization iterations | 200 or 500 |
-| --init_NMF_iter     | int | number of NMF iterations multiplied by 2; an odd number will include an extra round of optimation of latent states | 10 |
+| --init_NMF_iter     | int | number of NMF iterations for initialization of SpiceMix, multiplied by 2; an odd number will include an extra round of optimization of latent states | 10 |
 | --beta              | list of floats (Python expression) | A Python expression of a list of positive weights for FOVs, the weight will be normalized to be sum-to-one | "[1,1,1]", "[1,10]" |
 
 #### Reproducibility related parameters
@@ -109,7 +109,7 @@ python main.py -K=20 --dataset="simulation 1" --repli_list="[1,3]" --use_spatial
 
 ### Locating results
 
-The output of one SpiceMix run is saved an HDF5 file in the `results` directory and its name is specified via the argument to `--result_filename`. In an HDF5 file, there are four groups and the content is organized in the following structure:
+The output of one SpiceMix run is saved in an HDF5 file in the `results` directory and its name is specified via the argument to `--result_filename`. In an HDF5 file, there are four groups and the content is organized in the following structure:
 
 - `hyperparameters`: Hyperparameters specified for this run. For example,
   - `hyperparameters/K`: the number of metagenes;
