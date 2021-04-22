@@ -3,7 +3,7 @@ from multiprocessing import Pool
 from util import print_datetime
 
 import numpy as np
-import sklearn.cluster, sklearn.covariance
+from sklearn.cluster import KMeans
 import gurobipy as grb
 
 
@@ -43,7 +43,7 @@ def NMF_stepX(YT, M, XT, prior_x, X_constraint, dropout_mode):
 	return XT
 
 
-def initializeMXTsByPartialNMF(self, prior_x_modes, num_NMF_iter):
+def initializeMXTsByPartialNMF(self, prior_x_modes, num_NMF_iter, num_processes=1):
 	self.XTs = [np.zeros([N, self.K], dtype=float) for N in self.Ns]
 
 	self.sigma_yx_invs = [1/YT.std(0).mean() for YT in self.YTs]
@@ -78,7 +78,7 @@ def initializeMXTsByPartialNMF(self, prior_x_modes, num_NMF_iter):
 
 	while iiter2 < niter2:
 		# update XT
-		with Pool(min(8, len(self.YTs))) as pool:
+		with Pool(min(num_processes, len(self.YTs))) as pool:
 			self.XTs = pool.starmap(NMF_stepX, zip(
 				self.YTs, [self.M]*self.num_repli, self.XTs, prior_x_modes,
 				[self.X_constraint]*self.num_repli, [self.dropout_mode]*self.num_repli,
@@ -228,7 +228,7 @@ def initializeMByKMeans(YTs, K, random_seed4kmeans=0):
 	n_init = 10
 	logging.info(f'{print_datetime()}random seed for K-Means = {random_seed4kmeans}')
 	logging.info(f'{print_datetime()}n_init for K-Means = {n_init}')
-	kmeans = sklearn.cluster.KMeans(
+	kmeans = KMeans(
 		n_clusters=K,
 		random_state=random_seed4kmeans,
 		n_jobs=1,

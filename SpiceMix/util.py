@@ -9,6 +9,9 @@ import networkx as nx
 pid = os.getpid()
 psutil_process = psutil.Process(pid)
 
+# PyTorchDType = torch.float
+PyTorchDType = torch.double
+
 
 def print_datetime():
 	return datetime.datetime.now().strftime('[%Y/%m/%d %H:%M:%S]\t')
@@ -57,26 +60,3 @@ def unzipTensors(arr, shapes):
 		tensors.append(arr[:size].reshape(*shape).squeeze())
 		arr = arr[size:]
 	return tensors
-
-
-# PyTorchDType = torch.float
-PyTorchDType = torch.double
-
-
-def calcPermutation(sim):
-	assert sim.ndim == 2
-	B = nx.Graph()
-	B.add_nodes_from([f'o{i}' for i in range(sim.shape[0])], bipartite=0)
-	B.add_nodes_from([f't{i}' for i in range(sim.shape[1])], bipartite=1)
-	B.add_edges_from([
-		(f'o{i}', f't{j}', {'weight': sim[i, j]})
-		for i in range(sim.shape[0]) for j in range(sim.shape[1])
-	])
-	assert nx.is_bipartite(B)
-	matching = nx.max_weight_matching(B, maxcardinality=True)
-	assert len(set(__ for _ in matching for __ in _)) == 2*min(sim.shape)
-	matching = [_ if _[0][0] == 'o' else _[::-1] for _ in matching]
-	matching = [tuple(int(__[1:]) for __ in _) for _ in matching]
-	matching = sorted(matching, key=lambda x: x[1])
-	perm, index = map(np.array, zip(*matching))
-	return perm, index

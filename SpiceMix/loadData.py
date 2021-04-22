@@ -24,8 +24,10 @@ def loadEdges(filename, N):
 	assert edges.shape[1] == 2, f'Detected an edge that does not contain two nodes'
 	assert np.all(0 <= edges) and np.all(edges < N), f'Node ID exceeded range [0, N)'
 	edges = np.sort(edges, axis=1)
-	assert np.all(edges[:, 0] < edges[:, 1]), f'Detected self-loop(s)'
-	assert len(np.unique(edges, axis=0)) == len(edges), f'Detected duplicate edges'
+	assert np.all(edges[:, 0] < edges[:, 1]), f'Detected {(edges[:, 0] == edges[:, 1]).sum()} self-loop(s)'
+	if len(np.unique(edges, axis=0)) != len(edges):
+		logging.warning(f'Detected {len(edges)-len(np.unique(edges, axis=0))} duplicate edge(s) from {len(edges)} loaded edges. Duplicate edges are discarded.')
+		edges = np.unique(edges, axis=0)
 	logging.info(f'{print_datetime()}Loaded {len(edges)} edges from {filename}')
 	E = [[] for _ in range(N)]
 	for (u, v) in edges:

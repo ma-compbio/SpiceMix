@@ -16,11 +16,14 @@ from estimateParameters import estimateParametersX, estimateParametersY
 
 class Model:
 	def __init__(
-			self, PyTorch_device, path2dataset, repli_list, use_spatial, neighbor_suffix, expression_suffix,
+			self, path2dataset, repli_list, use_spatial, neighbor_suffix, expression_suffix,
 			K, lambda_SigmaXInv, betas, prior_x_modes,
 			result_filename=None,
+			PyTorch_device='cpu', num_processes=1,
 	):
 		self.PyTorch_device = PyTorch_device
+		self.num_processes = num_processes
+
 		self.path2dataset = Path(path2dataset)
 		self.repli_list = repli_list
 		self.use_spatial = use_spatial
@@ -47,8 +50,8 @@ class Model:
 			self.result_filename = None
 		self.saveHyperparameters()
 
-	def __del__(self):
-		pass
+	# def __del__(self):
+	# 	pass
 		# if self.result_h5 is not None:
 		# 	self.result_h5.close()
 
@@ -65,7 +68,7 @@ class Model:
 		assert self.pairwise_potential_mode == 'normalized'
 
 		rXTs = []
-		with Pool(min(5, self.num_repli)) as pool:
+		with Pool(min(self.num_processes, self.num_repli)) as pool:
 			for i in range(self.num_repli):
 				if self.Es_empty[i]:
 					rXTs.append(pool.apply_async(estimateWeightsWithoutNeighbor, args=(

@@ -4,7 +4,6 @@ from multiprocessing import Pool
 from util import print_datetime
 
 import numpy as np
-import sklearn.cluster, sklearn.covariance
 import gurobipy as grb
 import torch
 

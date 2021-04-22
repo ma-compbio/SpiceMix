@@ -28,7 +28,7 @@ def parse_arguments():
 		help='Suffix of the name of the file that contains expressions'
 	)
 	parser.add_argument(
-		'--repli_list', type=eval,
+		'--repli_list', type=lambda x: list(map(str, eval(x))),
 		help='list of names of the experiments, a Python expression, e.g., "[0,1,2]", "range(5)"'
 	)
 	parser.add_argument(
@@ -58,7 +58,8 @@ def parse_arguments():
 		help="Which GPU to use. The value should be either string of form 'cuda_<GPU id>' "
 			 "or an integer denoting the GPU id. -1 or 'cpu' for cpu only",
 	)
-	parser.add_argument('--num_threads', type=int, default=1, help='Number of CPU threads')
+	parser.add_argument('--num_threads', type=int, default=1, help='Number of CPU threads for PyTorch')
+	parser.add_argument('--num_processes', type=int, default=1, help='Number of processes')
 
 	parser.add_argument(
 		'--result_filename', default=None, help='The name of the h5 file to store results'
@@ -73,10 +74,10 @@ if __name__ == '__main__':
 
 	logging.basicConfig(level=logging.INFO)
 
-	print(f'pid = {os.getpid()}')
+	logging.info(f'pid = {os.getpid()}')
 
 	np.random.seed(args.random_seed)
-	print(f'random seed = {args.random_seed}')
+	logging.info(f'random seed = {args.random_seed}')
 
 	torch.set_num_threads(args.num_threads)
 
@@ -92,13 +93,6 @@ if __name__ == '__main__':
 		prior_x_modes=np.array(['Exponential shared fixed']*len(args.repli_list)),
 		result_filename=args.result_filename,
 	)
-
-	# prior_x_strs = ['Gaussian'] * len(YTs)
-	# prior_x_strs = ['Truncated Gaussian'] * len(YTs)
-	# prior_x_strs = ['Exponential shared'] * len(YTs)
-	# prior_x_strs = ['Exponential shared fixed'] * len(YTs)
-	# prior_x_strs = ['Exponential'] * len(YTs)
-	# print(f"prior_x_str = {'	'.join(prior_x_strs)}")
 
 	model.initialize(
 		random_seed4kmeans=args.random_seed4kmeans, num_NMF_iter=args.init_NMF_iter,

@@ -1,13 +1,14 @@
-import sys, timeit, itertools, psutil, resource, logging
+import sys, time, itertools, resource, logging
 from multiprocessing import Pool, Process
-from util import psutil_process, print_datetime, array2string
+from util import psutil_process, print_datetime, array2string, PyTorchDType as dtype
 
 import torch
 import numpy as np
 import gurobipy as grb
-import scipy,  scipy.spatial,  scipy.stats
+from scipy.special import loggamma
 
-from sampleForIntegral import *
+from sampleForIntegral import integrateOfExponentialOverSimplexInduction2
+
 
 def estimateParametersY(self, max_iter=10):
 	logging.info(f'{print_datetime()}Estimating M and sigma_yx_inv')
@@ -143,7 +144,7 @@ def estimateParametersX(self, iiter):
 				lambda_x, = prior_x[1:]
 				lambda_x = talpha.mean().div_(N).pow(-1).cpu().data.numpy()
 				Q_X -= lambda_x * talpha.sum().cpu().data.numpy()
-				Q_X += N*self.K*np.log(lambda_x) - N*scipy.special.loggamma(self.K)
+				Q_X += N*self.K*np.log(lambda_x) - N*loggamma(self.K)
 				prior_x = prior_x[:1] + (np.full(self.K, lambda_x), )
 				self.prior_xs.append(prior_x)
 			elif prior_x[0] == 'Exponential shared fixed':
