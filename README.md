@@ -20,7 +20,7 @@ SpiceMix can be applied to any type of spatial transcriptomics data, including M
 
 All code is contained within the SpiceMix folder. The script `main.py` runs the program -- see examples for usage.
 
-### Step 1: preparing input files
+### Step 1: Preparing input files
 
 All files for one run of SpiceMix must be put into one directory. SpiceMix can be applied to multiple samples (or replicates, or fields-of-view (FOV)) simultaneously, learning shared parameters across samples (we use the term FOV for an independent sample). For each FOV with name `<FOV>` of `N` cells and `G` genes, the following two files stored as tab-delimited txt format are required for SpiceMix:
 
