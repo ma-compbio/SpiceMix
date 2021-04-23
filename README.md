@@ -89,6 +89,7 @@ simulation 1
 |   └── celltypes_2.txt
 ├── results // This directory will be created automatically, if absent
 └── some other directories // SpiceMix discards any other directories
+```
 
 ### Step 3: Inferring latent states, metagenes, and pairwise affinity matrix
 
