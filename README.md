@@ -126,11 +126,11 @@ SpiceMix requires a few arguments to specify the input files and hyperparameters
 
 For example, this command runs SpiceMix on FOVs 1 and 3 from dataset `simulation 1` with `K=20` metagenes and the spatial information of both FOVs are used:
 ```
-python main.py -K=20 --dataset="simulation 1" --repli_list="[1,3]" --use_spatial="[True]*2" --result_filename="SpiceMix_K20_FOV13"
+python main.py -K=20 --dataset="path/to/simulation 1" --repli_list="[1,3]" --use_spatial="[True]*2" --result_filename="SpiceMix_K20_FOV13"
 ```
 To run NMF on FOVs 1 and 3 on the same dataset with identical settings, we can use the following command:
 ```
-python main.py -K=20 --dataset="simulation 1" --repli_list="[1,3]" --use_spatial="[False]*2" --result_filename="NMF_K20_FOV13"
+python main.py -K=20 --dataset="path/to/simulation 1" --repli_list="[1,3]" --use_spatial="[False]*2" --result_filename="NMF_K20_FOV13"
 ```
 
 ### Locating results
