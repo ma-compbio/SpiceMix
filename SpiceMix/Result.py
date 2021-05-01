@@ -27,6 +27,36 @@ from loadData import loadExpression, loadDataset
 from Model import Model
 
 
+def plotConvergenceQ(ax, path2dataset, result_filename, **kwargs):
+	with openH5File(path2dataset / 'results' / result_filename, 'r') as f:
+		g = f['progress/Q']
+		k = np.fromiter(map(int, g.keys()), dtype=int)
+		v = np.fromiter((g[str(_)][()] for _ in k), dtype=float)
+	Q = np.full(k.max() - k.min() + 1, np.nan)
+	Q[k - k.min()] = v
+	print(f'Found {k.max()} iterations from {result_filename}')
+	for kk, linestyle in zip([1, 5, 25], ['-', '--', ':']):
+		if kk in [25]: continue
+		if kk >= len(Q): continue
+		dQ = (Q[kk:] - Q[:-kk]) / kk
+		# print(f'min dQ = {dQ[np.logical_not(np.isnan(dQ))].min():.2e}')
+		# dQ += 1e-1
+		ax.plot(np.arange(k.min(), k.max() + 1 - kk) + kk / 2 + 1, dQ, linestyle=linestyle, **kwargs)
+
+
+def findBest(path2dataset, result_filenames, iiter=-1):
+	Q = []
+	for r in result_filenames:
+		f = openH5File(path2dataset / 'results' / r, 'r')
+		i = parseIiter(f[f'progress/Q'], iiter)
+		print(f'Using iteration {i} from {r}')
+		Q.append(f[f'progress/Q/{i}'][()])
+		f.close()
+	i = np.argmax(Q)
+	print(f'The best one is model #{i} - result filename = {result_filenames[i]}')
+	return result_filenames[i]
+
+
 class Result:
 	def __init__(
 			self, path2dataset, result_filename,
