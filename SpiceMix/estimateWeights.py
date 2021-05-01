@@ -66,6 +66,7 @@ def estimateWeightsWithoutNeighbor(YT, M, XT, prior_x, sigma_yx_inv, X_constrain
 
 
 def estimateWeightsICM(YT, E, M, XT, prior_x, sigma_yx_inv, Sigma_x_inv, X_constraint, dropout_mode, pairwise_potential_mode, irepli):
+	logging.info(f'{print_datetime()}Estimating weights in repli {irepli} using ICM')
 	N, G = YT.shape
 	K = M.shape[1]
 	MTM = None
@@ -135,8 +136,7 @@ def estimateWeightsICM(YT, E, M, XT, prior_x, sigma_yx_inv, Sigma_x_inv, X_const
 						del lambda_x
 					else:
 						raise NotImplementedError
-					b = np.maximum(b, 0)
-					s_new = b / a
+					s_new = b / (a+1e-30)
 					s_new = np.maximum(s_new, 1e-15)
 					ds = s_new - s
 					stop_flag &= np.abs(ds) / (s + 1e-15) < 1e-3
@@ -165,6 +165,8 @@ def estimateWeightsICM(YT, E, M, XT, prior_x, sigma_yx_inv, Sigma_x_inv, X_const
 					dz = z_new - z
 					stop_flag &= np.abs(dz).max() < 1e-3
 					z = z_new
+					assert z.min() >= 0
+					assert np.abs(z.sum()-1) < 1e-5
 
 					if not stop_flag and iiiter == max_iter_individual-1:
 						logging.warning(f'Cell {i} in the {irepli}-th repli did not converge in {max_iter_individual} iterations;\ts = {s:.2e}, ds = {ds:.2e}, max dz = {np.abs(dz).max():.2e}')

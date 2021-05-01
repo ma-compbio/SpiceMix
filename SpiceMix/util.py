@@ -45,6 +45,17 @@ def parseIiter(g, iiter):
 	return iiter
 
 
+def a2i(a, order=None, ignores=()):
+	if order is None:
+		order = list(set(a) - set(ignores))
+	else:
+		order = order[~np.isin(order, list(ignores))]
+	d = dict(zip(order, range(len(order))))
+	for k in ignores: d[k] = -1
+	a = np.fromiter(map(d.get, a), dtype=int)
+	return a, d, order
+
+
 def zipTensors(*tensors):
 	return np.concatenate([
 		np.array(a).flatten()

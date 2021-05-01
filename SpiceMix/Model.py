@@ -77,11 +77,16 @@ class Model:
 						self.X_constraint, self.dropout_mode, i,
 					)))
 				else:
-					rXTs.append(pool.apply_async(estimateWeightsICM, args=(
+					# rXTs.append(pool.apply_async(estimateWeightsICM, args=(
+					# 	self.YTs[i], self.Es[i],
+					# 	self.M[:self.Gs[i]], self.XTs[i], self.prior_xs[i], self.sigma_yx_invs[i], self.Sigma_x_inv,
+					# 	self.X_constraint, self.dropout_mode, self.pairwise_potential_mode, i,
+					# )))
+					rXTs.append(estimateWeightsICM(
 						self.YTs[i], self.Es[i],
 						self.M[:self.Gs[i]], self.XTs[i], self.prior_xs[i], self.sigma_yx_invs[i], self.Sigma_x_inv,
 						self.X_constraint, self.dropout_mode, self.pairwise_potential_mode, i,
-					)))
+					))
 			self.XTs = [_.get(1e9) if isinstance(_, multiprocessing.pool.ApplyResult) else _ for _ in rXTs]
 		pool.join()
 

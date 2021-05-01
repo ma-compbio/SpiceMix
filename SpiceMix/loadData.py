@@ -54,7 +54,7 @@ def loadDataset(self, neighbor_suffix=None, expression_suffix=None):
 
 	self.YTs = []
 	for i in self.repli_list:
-		for s in ['txt', 'pkl', 'pickle']:
+		for s in ['txt', 'tsv', 'pkl', 'pickle']:
 			path2file = self.path2dataset / 'files' / f'expression_{i}{expression_suffix}.{s}'
 			if not path2file.exists(): continue
 			self.YTs.append(loadExpression(path2file))
@@ -65,5 +65,11 @@ def loadDataset(self, neighbor_suffix=None, expression_suffix=None):
 		if u else [[] for _ in range(N)]
 		for i, N, u in zip(self.repli_list, self.Ns, self.use_spatial)
 	]
-
 	self.Es_empty = [sum(map(len, E)) == 0 for E in self.Es]
+	try:
+		self.genes = [
+			loadGeneList(self.path2dataset / 'files' / f'genes_{i}{expression_suffix}.txt')
+			for i in self.repli_list
+		]
+	except:
+		pass
