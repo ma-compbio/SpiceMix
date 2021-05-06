@@ -39,8 +39,8 @@ The two suffices are optional, and the preceding underscore `_` should be absent
 
 The following data are used in downstream analysis and visualization:
 
-- Gene names or symbols. These can be stored in a multi-line file with one gene per line. The order of genes should match that in `expression_<FOV>_<expr_suffix>.txt`.
-- Cells' spatial coordinates in the 2D or 3D space.
+- `genes_<FOV>_<expr_suffix>.txt`, multi-line file containing gene names or symbols with one gene per line. The order of genes should match that in `expression_<FOV>_<expr_suffix>.txt`.
+- `celltypes_<FOV>.txt`Cells' spatial coordinates in the 2D or 3D space.
 
 ### Step 2: Organizing files
 
