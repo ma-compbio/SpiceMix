@@ -8,6 +8,8 @@ SpiceMix can be applied to any type spatial transcriptomics data, including MERF
 
 ## Requirement
 
+Python package dependencies:
+
 - Python=3.7.3
 - scipy=1.2.1
 - psutil=5.6.3
@@ -15,6 +17,13 @@ SpiceMix can be applied to any type spatial transcriptomics data, including MERF
 - pytorch=1.0.1
 - numpy=1.16.2
 - scikit-learn=0.21.1
+
+Computing resources:
+
+- CPU
+- 8 GB RAM
+- < 100M storage per run
+- GPU (optional)
 
 ## Running SpiceMix
 
