@@ -161,7 +161,7 @@ def synthesize_cell_embeddings(points, distributions, cell_type_definitions, mas
     X = np.zeros((num_cells, num_metagenes))
     
     for pattern_index in range(len(mask_conditions)):
-        pattern = mask_conditions[pattern_index](points[:, 0])
+        pattern = mask_conditions[pattern_index](points)
         cell_type_definition = cell_type_definitions[pattern_index]
         distribution = distributions[pattern_index]
         
