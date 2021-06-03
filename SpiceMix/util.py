@@ -1,19 +1,67 @@
-import numpy as np
-import os, time, pickle, sys, psutil, resource
-import matplotlib.markers
-import torch
+import os, time, pickle, sys, psutil, resource, datetime, h5py, logging
 from collections import Iterable
 
-path2dir = os.path.dirname(__file__)
+import numpy as np
+import torch
+import networkx as nx
+
 
 pid = os.getpid()
 psutil_process = psutil.Process(pid)
+
+# PyTorchDType = torch.float
+PyTorchDType = torch.double
+
+
+def print_datetime():
+	return datetime.datetime.now().strftime('[%Y/%m/%d %H:%M:%S]\t')
+
+
+def array2string(x):
+	return np.array2string(x, formatter={'all': '{:.2e}'.format})
+
+
+def parseSuffix(s):
+	return '' if s is None or s == '' else '_' + s
+
+
+def openH5File(filename, mode='a', num_attempts=5, duration=1):
+	for i in range(num_attempts):
+		try:
+			return h5py.File(filename, mode=mode)
+		except OSError as e:
+			logging.warning(str(e))
+			time.sleep(duration)
+	return None
+
+
+def encode4h5(v):
+	if isinstance(v, str): return v.encode('utf-8')
+	return v
+
+
+def parseIiter(g, iiter):
+	if iiter < 0: iiter += max(map(int, g.keys())) + 1
+	return iiter
+
+
+def a2i(a, order=None, ignores=()):
+	if order is None:
+		order = list(set(a) - set(ignores))
+	else:
+		order = order[~np.isin(order, list(ignores))]
+	d = dict(zip(order, range(len(order))))
+	for k in ignores: d[k] = -1
+	a = np.fromiter(map(d.get, a), dtype=int)
+	return a, d, order
+
 
 def zipTensors(*tensors):
 	return np.concatenate([
 		np.array(a).flatten()
 		for a in tensors
 	])
+
 
 def unzipTensors(arr, shapes):
 	assert np.all(arr.shape == (np.sum(list(map(np.prod, shapes))),))
@@ -23,55 +71,3 @@ def unzipTensors(arr, shapes):
 		tensors.append(arr[:size].reshape(*shape).squeeze())
 		arr = arr[size:]
 	return tensors
-
-def dataFolder(dataset): return os.path.join(path2dir, '..', 'data', dataset, 'files')
-
-# PyTorchDType = torch.float
-PyTorchDType = torch.double
-# force_cpu = True
-force_cpu = False
-if torch.cuda.is_available() and not force_cpu:
-	PyTorchDevice = torch.device('cuda')
-else:
-	PyTorchDevice = torch.device('cpu')
-	torch.set_num_threads(4)
-
-class Logger:
-	def __init__(self, dataset, tm=None):
-		if tm is None: tm = time.strftime('%Y-%m-%d-%H-%M-%S') + '_' + str(os.getpid())
-		self.folder = os.path.join(path2dir, '..', 'data', dataset, 'logs', tm)
-		os.makedirs(self.folder, exist_ok=True)
-		print(f'log folder = {self.folder}')
-	def log(self, filename, x):
-		with open(os.path.join(self.folder, filename + '.pkl'), 'wb') as f: pickle.dump(x, f, protocol=2)
-
-def loadLog(dataset, tm, limit=None):
-	H_Theta_Q = [[], [], []]
-	if isinstance(limit, list): limit = iter(limit)
-	if isinstance(limit, Iterable): i = next(limit, None)
-	else: i = 0
-	while True:
-		stop_flag = False
-
-		for a, text in zip(H_Theta_Q, ['H', 'Theta', 'Q']):
-			filename = os.path.join(path2dir, '..', 'data', dataset, 'logs', tm, f'{text}_{i}.pkl')
-
-			if os.path.exists(filename):
-				# print('loading file {}'.format(filename))
-				with open(filename, 'rb') as f: a.append(pickle.load(f))
-			else:
-				stop_flag = True
-
-			if stop_flag: break
-
-		if isinstance(limit, Iterable):
-			i = next(limit, None)
-			if i is None: stop_flag = True
-		elif isinstance(limit, int):
-			i += 1
-			if i > limit: stop_flag = True
-		else:
-			i += 1
-
-		if stop_flag: break
-	return tuple(H_Theta_Q)

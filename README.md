@@ -4,7 +4,7 @@
 
 SpiceMix is an unsupervised tool for analyzing data of the spatial transcriptome. SpiceMix models the observed expression of genes within a cell as a mixture of latent factors. These factors are assumed to have some spatial affinity between neighboring cells. The factors and affinities are not known a priori, but are learned by SpiceMix directly from the data, by an alternating optimization method that seeks to maximize their posterior probability given the observed gene expression. In this way, SpiceMix learns a more expressive representation of the identity of cells from their spatial transcriptome data than other available methods. 
 
-SpiceMix can be applied to any type spatial transcriptomics data, including MERFISH, seqFISH, and HDST.
+SpiceMix can be applied to any type of spatial transcriptomics data, including MERFISH, seqFISH, HDST, and Slide-seq.
 
 ## Requirement
 
@@ -12,11 +12,11 @@ Python package dependencies:
 
 - Python=3.7.3
 - scipy=1.2.1
-- psutil=5.6.3
 - gurobi=8.1.1
-- pytorch=1.0.1
+- pytorch=1.4.0
 - numpy=1.16.2
 - scikit-learn=0.21.1
+- h5py=3.1.0
 
 Computing resources:
 
@@ -27,86 +27,102 @@ Computing resources:
 
 ## Running SpiceMix
 
-All code is contained within the SpiceMix folder. The script `main.py` runs the program -- see details for example usage.
+All code is contained within the SpiceMix folder. The script `main.py` runs the program -- see examples for usage.
 
-### Step 1: preparing input files
+### Step 1: Preparing input files
 
-All files for one run of SpiceMix must be put into one directory. For each FOV with name `<FOV>` of `N` cells and `G` genes, the following two files stored as tab-delimited txt format are required for SpiceMix:
+All files for one run of SpiceMix must be put into one directory. SpiceMix can be applied to multiple samples (or replicates, or fields-of-view (FOV)) simultaneously, learning shared parameters across samples (we use the term FOV for an independent sample). For each FOV with name `<FOV>` of `N` cells and `G` genes, the following two files stored as tab-delimited txt format are required for SpiceMix:
 
 - `expression_<FOV>_<expr_suffix>.txt`, an N-by-G nonnegative-valued matrix of normalized single-cell expression profiles. In our paper, we applied the following steps of normalization to all data sets:
-  - Filter out genes with low nonzero rates and/or cells that express a few genes
+  - Filter out genes with low nonzero rates and/or cells that express only a few genes
   - Log transformation: Let <img src="https://render.githubusercontent.com/render/math?math=E_{ig}"> be the read counts of gene `g` in cell `i`, and the number of counts after log transformation is ![formula](https://render.githubusercontent.com/render/math?math=E'_{ig}=\log(1%2B10^4\cdot%20E_{ij}/\sum_{g'=1}^GE_{ig'}))
-- `neighborhood_<FOV>_<neigh_suffix>.txt`, a neighbor graph represented as a list of cell pairs, i.e., an `|E|`-by-2 integer-valued matrix. Cells are assigned with integer indices starting from 0 in the order that they appear in the expression profile file. We recommend the following two methods to generate the neighbor graph from cells' spatial coordinates:
+- `neighborhood_<FOV>_<neigh_suffix>.txt`, a neighbor graph represented as a list of cell pairs, i.e., an `|E|`-by-2 integer-valued matrix, where `|E|` is the number of edges in the graph. Cells are assigned with integer indices starting from 0 in the order that they appear in the expression profile file. We recommend the following two methods to generate the neighbor graph from cells' spatial coordinates:
   - K-nearest neighbor graph under Euclidean metric
   - Delaunay triangulation followed by discarding interactions between cells that are far away from each other
 
+The following files for each FOV are required for downstream analysis and visualization:
+
+- `genes_<FOV>_<expr_suffix>.txt`, a multi-line file containing gene IDs or symbols, one gene per line. The order of genes should match that in `expression_<FOV>_<expr_suffix>.txt`.
+- `coordinates_<FOV>.txt`, an N-by-2 matrix of single cells' spatial coordinates in the 2D or 3D space. The current tutorial notebook works only with 2D coordinates.
+- `celltypes_<FOV>.txt`, a multi-line file containing cell types from other analysis, one cell type per line. The order of cells should match that in `expression_<FOV>_<expr_suffix>.txt`.
+
 When there are multiple isolated FOVs, the order of genes in `expression_<FOV>_<expr_suffix>.txt` for all FOVs must be identical.
 
-The FOV name, denoted by `<FOV>` here, is required in order to distinguish between cells from different FOVs, especially when they don't share the same coordinate system. FOV names can be any string, including `1`, `cortex`, `mouse brain Oct-10-2020`.
-To compare different normalizations and neighbor graphs, the two suffices, `<expr_suffix>` and `<neigh_suffix>`, can be used to distinguish between normalizations and neighbor graphs, respectively. For example, `neighborhood_3_KNN.txt` and `neighborhood_3_Delaunay.txt` may denote the neighbor graph generated by k-nearest neighbor and Delaunay triangulation, respectively.
-The two suffices are optional, and the preceding underscore `_` should be absent when the corresponding suffix is an empty string.
+The FOV name, denoted by `<FOV>` here, is required in order to distinguish between cells from different FOVs, especially when they don't share the same coordinate system. FOV names can be any string, such as '1', 'cortex', 'mouse brain Oct-10-2020'.
 
-The following data are used in downstream analysis and visualization:
+To compare different preprocessing approaches, the two suffices, `<expr_suffix>` and `<neigh_suffix>`, can be specified for each normalization and neighbor graph, respectively. For example, `neighborhood_3_10NN.txt` and `neighborhood_3_Delaunay.txt` may denote the neighbor graph of FOV 3 generated by 10-nearest neighbor and Delaunay triangulation, respectively. It is feasible for different preprocessing approaches to use different sets of genes. For example, we may 1) use all genes and set `<expr_suffix>` to `all`, and 2) keep genes that are expressed in at least 10% of cells and set `<expr_suffix>` to `nonzero10`. The two suffices are optional, and the preceding underscore `_` should be absent when the corresponding suffix is not used (an empty string).
 
-- `genes_<FOV>_<expr_suffix>.txt`, multi-line file containing gene names or symbols with one gene per line. The order of genes should match that in `expression_<FOV>_<expr_suffix>.txt`.
-- `celltypes_<FOV>.txt`Cells' spatial coordinates in the 2D or 3D space.
 
 ### Step 2: Organizing files
 
-In the root directory, two directories should be created and named `scripts` and `data`. In the `data` directory, every data set of one or multiple FOVs should have its own directory, named by the name of the data set. In the directory of each data set, two directories, named `files` and `logs`, need to be created. The `files` directory contains input files prepared in step 1, and the `log` directory is initially empty.
+We recommend creating one directory for every data set. In the directory, denoted by `<dataset>`, a directory named `files` should be created and all aforementioned input files should be put in this directory.
 
-For example, when there are two data sets, named `simulation 1` and `mouse primary visual cortex`, consisting of 3 and 2 FOVs, respectively, the file structure of Python scripts and input files should be as following:
+For example, when we have one dataset, named `simulation 1`, consisting of 3 FOVs, we should arrange the files in the following manner
 ```
-.
-├── SpiceMix
-│   ├── main.py
-│   ├── readData.py
-│   └── ...
-└── data
-    ├── simulation 1
-    |   ├── files
-    |   |   ├── expression_1.txt
-    |   |   ├── neighborhood_1.txt
-    |   |   ├── expression_2.txt
-    |   |   ├── neighborhood_2.txt
-    |   |   ├── expression_3.txt
-    |   |   └── neighborhood_3.txt
-    |   └── logs
-    └── mouse primary visual cortex
-        ├── files
-        |   ├── expression_A_allgenes.txt
-        |   ├── expression_A_top100genes.txt
-        |   ├── neighborhood_A_KNN.txt
-        |   ├── neighborhood_A_Delaunay.txt
-        |   ├── expression_B_allgenes.txt
-        |   ├── expression_B_top100genes.txt
-        |   ├── neighborhood_B_KNN.txt
-        |   ├── neighborhood_B_Delaunay.txt
-        └── logs
+simulation 1
+└── files
+    ├── expression_1.txt
+    ├── expression_2.txt
+    ├── expression_3.txt
+    ├── neighborhood_1.txt
+    ├── neighborhood_2.txt
+    ├── neighborhood_3.txt
+    ├── genes_1.txt
+    ├── genes_2.txt
+    ├── genes_3.txt
+    ├── coordinates_1.txt
+    ├── coordinates_2.txt
+    ├── coordinates_3.txt
+    ├── celltypes_1.txt
+    ├── celltypes_2.txt
+    └── celltypes_3.txt
+```
+When we have another dataset, named `simulation 2`, consisting of 2 FOVs, and we'd like to try different preprocessing approaches - `all` and `nonzero10` for filtering genes and `10NN` and `Delaunay` for generating neighbor graphs. We need to arrange files to 
+```
+simulation 2
+├── files
+|   ├── expression_1_all.txt
+|   ├── expression_2_all.txt
+|   ├── expression_1_nonzero10.txt
+|   ├── expression_2_nonzero10.txt
+|   ├── neighborhood_1_10NN.txt
+|   ├── neighborhood_2_10NN.txt
+|   ├── neighborhood_1_Delaunay.txt
+|   ├── neighborhood_2_Delaunay.txt
+|   ├── genes_1_all.txt
+|   ├── genes_2_all.txt
+|   ├── genes_1_nonzero10.txt
+|   ├── genes_2_nonzero10.txt
+|   ├── coordinates_1.txt
+|   ├── coordinates_2.txt
+|   ├── celltypes_1.txt
+|   └── celltypes_2.txt
+├── results // This directory will be created automatically, if absent
+└── some other directories // SpiceMix discards any other directories
 ```
 
 ### Step 3: Inferring latent states, metagenes, and pairwise affinity matrix
 
-SpiceMix requires a few arguments that specify input files and hyperparameters. Below is the table of description of all arguments:
+SpiceMix requires a few arguments to specify the input files and hyperparameters. Below is the table of the description of all arguments:
 
 #### Input related parameters
 | params | type | description | example |
 |-|-|-|-|
-| --dataset           | str | name of the dataset | "simulation 1" or "mouse primary visual cortex" |
+| --path2dataset      | str | path to the dataset | "simulation 1" or "../datasets/mouse primary visual cortex" |
 | --neighbor_suffix   | str | suffix of the name of the file that contains interacting cell pairs | "", "KNN", or "Delaunay" |
 | --expression_suffix | str | suffix of the name of the file that contains expressions | "", "allgenes", or "top100genes" |
-| --exper_list        | list of strings (Python expression)  | A Python expression of a list of FOV names | "[0,1,2]", "[A,B]", or "range(3)" |
+| --repli_list        | list of strings (Python expression)  | A Python expression of a list of FOV names | "[0,1,2]", "[A,B]", or "range(3)" |
 | --use_spatial       | list of booleans (Python expression) | A Python expression of a list of boolean variables controlling whether to use the neighbor graph for each FOV | "[True,True,True]", "[False]*5", or "[True,False,True]" |
 
 #### Hyperparameters
 
 | params | type | description | example |
 |-|-|-|-|
-| -K                  | int | dimension of latent space | 20 |
+| -K                  | int | number of metagenes; equivalently, dimension of latent space | 20 |
 | --lambda_SigmaXInv  | float | regularization on Sigma_x^{-1} | 1e-4 |
-| --max_iter          | int | maximum number of coordinate optimization iterations | 200 or 1000 |
-| --init_NMF_iter     | int | number of NMF iterations times 2: an odd number will include an extra optimation of latent states | 5 |
-| --beta              | list of floats (Python expression) | A Python expression of a list of real-values weights for FOVs, the weight will be normalized to be sum-to-one | "[1,1,1]", "[1,10]" |
+| --max_iter          | int | maximum number of coordinate optimization iterations | 200 or 500 |
+| --init_NMF_iter     | int | number of NMF iterations for initialization of SpiceMix, multiplied by 2; an odd number will include an extra round of optimization of latent states | 10 |
+| --beta              | list of floats (Python expression) | A Python expression of a list of positive weights for FOVs, the weight will be normalized to be sum-to-one | "[1,1,1]", "[1,10]" |
 
 #### Reproducibility related parameters
 | params | type | description | example |
@@ -116,25 +132,44 @@ SpiceMix requires a few arguments that specify input files and hyperparameters. 
 #### Output control
 | params | type | description | example |
 |-|-|-|-|
-| --logger | none | to save inferred parameters into files rather than outputing them to screen | N/A |
+| --result_filename | str | the name of the hdf5 file that stores inferred parameters | 'SpiceMix', or 'NMF' |
 
-To run SpiceMix, use the following command filled with proper value for each argument in the `script` directory, e.g.,
+
+#### Examples
+The following command runs SpiceMix on FOVs 1 and 3 from dataset `simulation 1` with `K=20` metagenes and the spatial information of both FOVs are used:
 ```
-python SpiceMix.py -K=20 --dataset="simulation 1" --exper_list="[1,2]" --use_spatial="[True]*2" --logger
+python main.py -K=20 --dataset="path/to/simulation 1" --repli_list="[1,3]" --use_spatial="[True]*2" --result_filename="SpiceMix_K20_FOV13.h5"
+```
+To run NMF on FOVs 1 and 3 on the same dataset with identical settings, we can use the following command:
+```
+python main.py -K=20 --dataset="path/to/simulation 1" --repli_list="[1,3]" --use_spatial="[False]*2" --result_filename="NMF_K20_FOV13.h5"
 ```
 
-### Locating results
+To specify the files generated by a particular preprocessng approach for dataset `simulation 2`, we can run
+```
+python main.py -K=20 --dataset="path/to/simulation 2" --repli_list="[1,2]" --use_spatial="[True]*2" --neighbor_suffix=10NN --expression_suffix=nonzero10 --result_filename="SpiceMix_K20_FOV12_10NN_nonzero10.h5"
+```
+and
+```
+python main.py -K=20 --dataset="path/to/simulation 2" --repli_list="[1,2]" --use_spatial="[False]*2" --neighbor_suffix=10NN --expression_suffix=nonzero10 --result_filename="NMF_K20_FOV12_10NN_nonzero10.h5"
+```
 
-The output of every SpiceMix run is saved into a directory, named by date, time, and PID, in the `logs` directory. After the `i`th iteration of the coordinate descent and the initialization (denoted by iteration `i=0`), three pickle files are produced:
+### Step 4: Locating results
 
-- `Q_<i>.pkl`, which contains a single real number which is the negative logarithm of the joint probability
-- `H_<i>.pkl`, which contains inferred latent states. In this file is tuple whose only element is a list of Numpy matrices, one for each FOV. For the `i`th FOV of `Ni` cells, the `i`th matrix in the list has dimension `Ni`-by-`K`. The cells appear in the same order as in `expression_<FOV>_<expr_suffix>.txt`.
-- `Theta_<i>.pkl`, which contains model parameters stored in a tuple of 5 elements. The 5 elements are:
-  - Metagenes, a `G`-by-`K` nonnegative matrix such that each column sums to one.
-  - Noise levels `σ_yx^-1`, an array of length equal to the number of FOVs. Currently, the noise levels of all FOVs are assumed to be the same.
-  - Pairwise affinity matrix `Σ_x^-1`, a `K`-by-`K` symmetric matrix, where negative values indicate appealing.
-  - Placeholder of an obsolete parameter.
-  - Prior of latent. Currently, all dimensions of the latent space are assumed to have exponential distribution with parameter 1.
+The output of one SpiceMix run is saved in an HDF5 file in the `results` directory and its name is specified via the argument to `--result_filename`. In an HDF5 file, there are four groups and the content is organized in the following structure:
+
+- `hyperparameters`: Hyperparameters specified for this run. For example,
+  - `hyperparameters/K`: the number of metagenes;
+  - `hyperparameters/lambda_SigmaXInv`: the value of the regularization coefficent on `Sigma_x^{-1}`;
+  - `hyperparameters/repli_list`: the list of replicate names.
+- `progress`: Criterion of convergence. Currently, only one indicator of convergence is implemented:
+  - `progress/Q/{i}`: the Q-value after the `i`th iteration, which is the negative logarithm of the joint probability.
+- `latent_states`: Latent states, currently including `X` only.
+  - `latent_states/XT/{repli_name}/{i}`: an N-by-K matrix containing the latent states in replicate `<repli_name>` after iteration `i`.
+- `parameters`: Model parameters:
+  - `parameters/M/{i}`: a G-by-K matrix containing the metagenes after iteration `i`;
+  - `parameters/Sigma_x_inv/{i}`: a K-by-K matrix containing the affinity matrix after iteration `i`;
+  - `parameters/sigma_yx_invs/{repli_name}/{i}`: the value of the reciprocal estimated reconstruction error in replicate `<repli_name>` after iteration `i`.
 
 ## Cite
 
