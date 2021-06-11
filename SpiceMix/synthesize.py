@@ -496,3 +496,201 @@ class SyntheticDataset:
         plt.ylabel('Metagene ID')
         plt.colorbar(image)
         plt.show()
+
+
+def synthesize_cell_expressions(points, distributions, cell_type_definitions, mask_conditions, num_genes, num_cells, signal_sigma_x=0.1, background_sigma_x=0.03, sigma_x_scale=1.0):
+    """Generate synthetic cell expressions.
+    
+    """
+    
+    cell_type = np.zeros((num_cells), dtype='int')
+    Y = np.zeros((num_cells, num_genes))
+    
+    for pattern_index in range(len(mask_conditions)):
+        pattern = mask_conditions[pattern_index](points)
+        cell_type_definition = cell_type_definitions[pattern_index]
+        distribution = distributions[pattern_index]
+        
+        cell_indices, = np.nonzero(pattern)
+        random.shuffle(cell_indices)
+        partition_indices = (np.cumsum(distribution) * len(cell_indices)).astype(int)
+        partitions = np.split(cell_indices, partition_indices[:-1])
+        
+        for cell_type_index in enumerate(cell_type_definition.iterrows()):
+            cell_type_composition = cell_type_definition[cell_type_index]
+            partition = partitions[cell_type_index]
+            cell_type[partition] = cell_type_index
+            Y[partition, num_genes] = cell_type_composition
+   
+    # # TODO: vectorize/ make add noise
+    # for cell in range(num_cells):
+    #     Y[cell, m] = sigma_x[metagene]*truncnorm.rvs(-Z[cell, metagene]/sigma_x[metagene], 100) + Z[cell, metagene]
+    
+    return Y, cell_type
+
+class SyntheticEmpiricalDataset:
+    """Synthetic mouse brain cortex dataset.
+    
+    This class provides methods for initializing a semi-random mouse cortex spatial
+    transcriptomics dataset, as well as methods to visualize aspects of the dataset.
+    
+    """
+    
+    def __init__(self, distributions, cell_type_definitions, mask_conditions,
+                 parameters, parent_directory, shared_metagenes=None, key=''):
+        self.num_cells = parameters['num_cells']
+        self.num_genes = parameters["num_genes"]
+        
+        # TODO: make color work for variable number of colors
+        self.colors = {0: 'darkkhaki', 1: 'mediumspringgreen', 2: 'greenyellow', 3: '#95bfa6',
+                       4: 'violet', 5: 'firebrick',
+                       6: 'deepskyblue', 7: 'darkslateblue'}
+        
+        print('Synthesizing Y and p...')
+        self.num_replicates = parameters['num_replicates']
+        self.sig_y = float(parameters['sigY_scale']) / self.num_genes
+        self.Y = np.zeros((self.num_replicates, self.num_genes, self.num_cells))
+        self.points = np.zeros((self.num_replicates, self.num_cells, 2))
+        self.affinity_matrices = np.zeros((self.num_replicates, self.num_cells, self.num_cells))
+        self.cell_types = np.zeros((self.num_replicates, self.num_cells))
+        
+        minimum_distance = 0.75 / np.sqrt(self.num_cells)
+        tau = minimum_distance * 2.2
+        for replicate in range(self.num_replicates):
+            p_i = sample_2D_points(self.num_cells, minimum_distance)
+            Y_i, C_i = synthesize_cell_expressions(p_i, distributions, cell_type_definitions, mask_conditions, self.num_genes, self.num_cells)
+
+            self.S = gamma.rvs(self.num_genes, scale=parameters['lambda_s'], size=self.num_cells)
+            self.affinity_matrices[replicate] = A_i
+            self.points[replicate] = p_i
+            self.Y[replicate] = Y_i * self.S
+            variance_y = (self.sig_y**2) * np.identity(self.num_genes)
+            
+            for cell in range(self.num_cells):
+                self.Y[replicate][:, cell] = sample_gaussian(variance_y, Y_i[:, cell])
+
+            self.cell_types[replicate] = C_i
+                
+        # gene_ind variable is just all genes -- we don't remove any
+        # TODO: remove this field
+        self.gene_ind = range(self.num_genes)
+        
+        # create empty Sig_x_inverse, since it is not used in this data generation
+        self.sigma_x_inverse = np.zeros((self.num_metagenes, self.num_metagenes))
+
+        data_subdirectory = 'synthetic_{}_{}_{}'
+        data_subdirectory = data_subdirectory.format(self.num_cells, self.num_genes, key)
+        
+        self.data_directory = Path(parent_directory) / data_subdirectory
+        self.initialize_data_directory()
+        
+        print('Finished')
+
+    def initialize_data_directory(self):
+        """Initialize data directory structure on user file system.
+        
+        """
+        (self.data_directory / "files").mkdir(parents=True, exist_ok=True)
+        (self.data_directory / "logs").mkdir(parents=True, exist_ok=True)
+        (self.data_directory / "scripts").mkdir(parents=True, exist_ok=True)
+        (self.data_directory / "plots").mkdir(parents=True, exist_ok=True)
+
+    def reformat(self):
+        """Save dataset features to be compatible with downstream processing.
+        
+        """
+
+        for replicate in range(self.num_replicates):
+            replicate_folder = self.data_directory / 'logs' / str(replicate)
+            replicate_folder.mkdir(parents=True, exist_ok=True)
+
+            Y_i = self.Y[replicate].T
+            p_i = self.points[replicate]
+            
+            np.savetxt(self.data_directory / 'files' / ('expression_{}.txt'.format(replicate)), Y_i, fmt='%.6f')
+            np.savetxt(self.data_directory / 'files' / ('coordinates_{}.txt'.format(replicate)), p_i, fmt='%.6f')
+            np.savetxt(self.data_directory / 'files'/ ('genes_{}.txt'.format(replicate)), np.arange(self.num_genes), fmt='%d')
+            
+            with open(self.data_directory / 'files' / ('neighborhood_{}.txt'.format(replicate)), 'w') as f:
+                for (source, destination), adjacency in np.ndenumerate(A_i):
+                    if adjacency == 1:
+                        f.write('{}\t{}\n'.format(source, destination))
+
+    def plot_cells_UMAP(self, replicate=0, latent_space=False, cell_types=None,colors=None,save_figure=False, normalize=True):
+        """Plot synthesized cells using UMAP.
+        """
+        # TODO: fix colors to be more compatible with variable cell types..
+        
+        gene_expression = self.Y[replicate].T
+            
+        num_cells, num_features = gene_expression.shape
+        C_i = self.cell_types[replicate]
+        
+        if not colors:
+            colors = {0: 'darkkhaki', 1: 'mediumspringgreen', 2: 'greenyellow', 3: '#95bfa6',
+                      4: 'violet', 5: 'firebrick', 6: 'gold',
+                      7: 'deepskyblue', 8: 'darkslateblue', 9: 'gainsboro'}
+
+        if normalize:
+            gene_expression = (gene_expression - np.average(gene_expression, axis=0))
+            gene_expression_std = gene_expression.std(axis=0)
+            for feature in range(num_features):
+                if gene_expression_std[feature] != 0:
+                    gene_expression[:, feature] = np.divide(gene_expression[:, feature], gene_expression_std[feature])
+
+        # TODO: cleanup unnecessary lines
+        gene_expression_reduced = umap.UMAP(
+                        n_components=2,
+                        #         spread=1,
+                        n_neighbors=10,
+                        min_dist=0.3,
+                        #         learning_rate=100,
+                        #         metric='euclidean',
+                        #         metric='manhattan',
+                        #         metric='canberra',
+                        #         metric='braycurtis',
+                        #         metric='mahalanobis',
+                        #         metric='cosine',
+                        #         metric='correlation',
+                        ).fit_transform(gene_expression)
+
+        fig = plt.figure(figsize=(7, 5))
+        ax = fig.add_axes([0.1, 0.1, .8, .8])
+        for color in np.unique(C_i):
+            index = (C_i == color)
+            ax.scatter(gene_expression_reduced[index, 0], gene_expression_reduced[index, 1], alpha=.7, c=colors[color])
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.yaxis.set_label_position("right")
+        plt.show()
+        
+        if save_figure:
+            plt.savefig(self.data_directory / "plots" / 'synthesized_data_umap.png')
+
+    def plot_cell_types(self, replicate=0, save_figure=False, colors=None):
+        """Plot cells in situ using cell type labels.
+        
+        """
+        
+        points = self.points[replicate]
+        affinity_matrix = self.affinity_matrices[replicate]
+        cell_types = self.cell_types[replicate]
+        if not colors:
+            colors = {0: 'sandybrown', 1: 'lightskyblue',
+                      2: 'mediumspringgreen', 3: 'palegreen',
+                      4: 'greenyellow', 5: 'darkseagreen',
+                      6: 'burlywood', 7: 'orangered', 8: 'firebrick',
+                      9: 'gold', 10: 'mediumorchid', 11: 'magenta',
+                      12: 'palegoldenrod', 13: 'gainsboro', 14: 'teal',
+                      15: 'darkslateblue'}
+        df = pd.DataFrame({'X': points[:, 0], 'Y': points[:, 1], 'cell_type': cell_types})
+        fig = plt.figure(figsize=(12, 6))
+        ax = fig.add_axes([0, 0, 1, 1])
+        
+        for (source, destination) in zip(*np.where(affinity_matrix == 1)):
+            plt.plot([points[source, 0], points[destination, 0]],
+                [points[source, 1], points[destination, 1]], color="gray", linewidth=1)
+        
+        sns.scatterplot(data=df, x='X', y='Y', hue='cell_type', ax=ax, palette=colors,
+                        legend=False, hue_order=list(set(cell_types)), size_norm=10.0)
+        plt.show()
