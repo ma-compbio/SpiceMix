@@ -43,8 +43,11 @@ All files for one run of SpiceMix must be put into one directory. SpiceMix can b
 The following files for each FOV are required for downstream analysis and visualization:
 
 - `genes_<FOV>_<expr_suffix>.txt`, a multi-line file containing gene IDs or symbols, one gene per line. The order of genes should match that in `expression_<FOV>_<expr_suffix>.txt`.
-- `coordinates_<FOV>.txt`, an N-by-2 matrix of single cells' spatial coordinates in the 2D or 3D space. The current tutorial notebook works only with 2D coordinates.
-- `celltypes_<FOV>.txt`, a multi-line file containing cell types from other analysis, one cell type per line. The order of cells should match that in `expression_<FOV>_<expr_suffix>.txt`.
+- `meta_<FOV>.csv`, a comma-separated table with one header line followed by `N` lines, one for each cell. The order of cells must be the same as the `expression_<FOV>_<expr_suffix>.txt` files. It is recommended to include the following columns:
+  - `coor X` and `coor Y` that store the spatial coordinate of single cells.
+  - `cell type` that stores the reference cell type assignments. Note that additional reference can be included with different column names.
+- (Deprecated) ~~`coordinates_<FOV>.txt`, an N-by-2 matrix of single cells' spatial coordinates in the 2D or 3D space. The current tutorial notebook works only with 2D coordinates.~~
+- (Deprecated) ~~`celltypes_<FOV>.txt`, a multi-line file containing cell types from other analysis, one cell type per line. The order of cells should match that in `expression_<FOV>_<expr_suffix>.txt`.~~
 
 When there are multiple isolated FOVs, the order of genes in `expression_<FOV>_<expr_suffix>.txt` for all FOVs must be identical.
 
