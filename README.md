@@ -73,13 +73,11 @@ simulation 1
     ├── genes_1.txt
     ├── genes_2.txt
     ├── genes_3.txt
-    ├── coordinates_1.txt
-    ├── coordinates_2.txt
-    ├── coordinates_3.txt
-    ├── celltypes_1.txt
-    ├── celltypes_2.txt
-    └── celltypes_3.txt
+    ├── meta_1.csv
+    ├── meta_2.csv
+    └── meta_3.csv
 ```
+
 When we have another dataset, named `simulation 2`, consisting of 2 FOVs, and we'd like to try different preprocessing approaches - `all` and `nonzero10` for filtering genes and `10NN` and `Delaunay` for generating neighbor graphs. We need to arrange files to 
 ```
 simulation 2
@@ -96,10 +94,8 @@ simulation 2
 |   ├── genes_2_all.txt
 |   ├── genes_1_nonzero10.txt
 |   ├── genes_2_nonzero10.txt
-|   ├── coordinates_1.txt
-|   ├── coordinates_2.txt
-|   ├── celltypes_1.txt
-|   └── celltypes_2.txt
+|   ├── meta_1.txt
+|   └── meta_2.txt
 ├── results // This directory will be created automatically, if absent
 └── some other directories // SpiceMix discards any other directories
 ```
