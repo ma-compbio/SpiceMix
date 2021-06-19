@@ -89,11 +89,19 @@ def generate_affinity_matrix(points, tau=1.0, method="delaunay"):
     num_cells = len(points)
     if method == "delaunay":
         affinity_matrix = np.zeros((num_cells, num_cells))
+        distance_matrix = np.zeros((num_cells, num_cells))
         triangulation = Delaunay(points)
         for triangle in triangulation.simplices:
             affinity_matrix[triangle[0], triangle[1]] = 1
+            distance_matrix[triangle[0], triangle[1]] = np.linalg.norm(points[triangle[0]] - points[triangle[1]])
             affinity_matrix[triangle[1], triangle[2]] = 1
+            distance_matrix[triangle[1], triangle[2]] = np.linalg.norm(points[triangle[1]] - points[triangle[2]])
             affinity_matrix[triangle[2], triangle[0]] = 1
+            distance_matrix[triangle[2], triangle[0]] = np.linalg.norm(points[triangle[2]] - points[triangle[0]])
+                  
+        print(distance_matrix)
+        # affinity_matrix[distance_matrix > np.percentile(distance_matrix, 95)] = 0
+
     else:
         disjoint_nodes = True
         while(disjoint_nodes):
