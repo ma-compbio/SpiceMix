@@ -48,6 +48,7 @@ def parse_arguments():
 		'--betas', default=np.ones(1), type=np.array,
 		help='Positive weights of the experiments; the sum will be normalized to 1; can be scalar (equal weight) or array-like'
 	)
+	parser.add_argument('--lambda_x', type=float, default=1., help='Prior of X')
 
 	def parse_cuda(x):
 		if x == '-1' or x == 'cpu': return 'cpu'
@@ -55,7 +56,7 @@ def parse_arguments():
 		if re.match('cuda:\d+$', x): return x
 	parser.add_argument(
 		'--device', type=parse_cuda, default='cpu', dest='PyTorch_device',
-		help="Which GPU to use. The value should be either string of form 'cuda_<GPU id>' "
+		help="Which GPU to use. The value should be either string of form 'cuda:<GPU id>' "
 			 "or an integer denoting the GPU id. -1 or 'cpu' for cpu only",
 	)
 	parser.add_argument('--num_threads', type=int, default=1, help='Number of CPU threads for PyTorch')
@@ -91,11 +92,12 @@ if __name__ == '__main__':
 		use_spatial=args.use_spatial, neighbor_suffix=args.neighbor_suffix, expression_suffix=args.expression_suffix,
 		K=args.K, lambda_SigmaXInv=args.lambda_SigmaXInv, betas=betas,
 		prior_x_modes=np.array(['Exponential shared fixed']*len(args.repli_list)),
-		result_filename=args.result_filename,
+		result_filename=args.result_filename, num_processes=int(args.num_processes),
 	)
 
 	model.initialize(
 		random_seed4kmeans=args.random_seed4kmeans, num_NMF_iter=args.init_NMF_iter,
+		lambda_x=args.lambda_x,
 	)
 
 	torch.cuda.empty_cache()

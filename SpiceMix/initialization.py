@@ -43,7 +43,7 @@ def NMF_stepX(YT, M, XT, prior_x, X_constraint, dropout_mode):
 	return XT
 
 
-def initializeMXTsByPartialNMF(self, prior_x_modes, num_NMF_iter, num_processes=1):
+def initializeMXTsByPartialNMF(self, prior_x_modes, num_NMF_iter, lambda_x=1, num_processes=1):
 	self.XTs = [np.zeros([N, self.K], dtype=float) for N in self.Ns]
 
 	self.sigma_yx_invs = [1/YT.std(0).mean() for YT in self.YTs]
@@ -55,8 +55,10 @@ def initializeMXTsByPartialNMF(self, prior_x_modes, num_NMF_iter, num_processes=
 			sigma_x_inv = np.full(self.K, np.sqrt(self.K) / YT.sum(1).std())
 			self.prior_xs.append((prior_x_mode, mu_x, sigma_x_inv, ))
 		elif prior_x_mode in ['Exponential', 'Exponential shared', 'Exponential shared fixed']:
-			lambda_x = np.full(self.K, G / self.GG * self.K / YT.sum(1).mean())
-			self.prior_xs.append((prior_x_mode, lambda_x, ))
+			# lambda_x = np.full(self.K, G / self.GG * self.K / YT.sum(1).mean())
+			assert np.abs(G / self.GG * self.K / YT.sum(1).mean() - 1.) < 1e-5
+			# self.prior_xs.append((prior_x_mode, lambda_x, ))
+			self.prior_xs.append((prior_x_mode, np.full(self.K, lambda_x), ))
 		else:
 			raise NotImplementedError(f'Prior on X {prior_x_mode} is not implemented')
 
@@ -238,7 +240,7 @@ def initializeMByKMeans(YTs, K, random_seed4kmeans=0):
 	return kmeans.cluster_centers_.T
 
 
-def initializeByKMean(self, random_seed4kmeans, num_NMF_iter=10, Sigma_x_inv_mode='Constant'):
+def initializeByKMean(self, random_seed4kmeans, lambda_x=1, num_NMF_iter=10, Sigma_x_inv_mode='Constant'):
 	logging.info(f'{print_datetime()}Initialization begins')
 	# initialize M
 	self.M = initializeMByKMeans(self.YTs, self.K, random_seed4kmeans=random_seed4kmeans)
@@ -251,7 +253,7 @@ def initializeByKMean(self, random_seed4kmeans, num_NMF_iter=10, Sigma_x_inv_mod
 
 	# initialize XT and perhaps update M
 	# sigma_yx is estimated from XT and M
-	initializeMXTsByPartialNMF(self, prior_x_modes=self.prior_x_modes, num_NMF_iter=num_NMF_iter)
+	initializeMXTsByPartialNMF(self, prior_x_modes=self.prior_x_modes, num_NMF_iter=num_NMF_iter, lambda_x=lambda_x)
 
 	if all(self.Es_empty): Sigma_x_inv_mode = 'Constant'
 	logging.info(f'{print_datetime()}Sigma_x_inv_mode = {Sigma_x_inv_mode}')

@@ -58,6 +58,7 @@ def loadDataset(self, neighbor_suffix=None, expression_suffix=None):
 			path2file = self.path2dataset / 'files' / f'expression_{i}{expression_suffix}.{s}'
 			if not path2file.exists(): continue
 			self.YTs.append(loadExpression(path2file))
+	assert len(self.YTs) == len(self.repli_list)
 	self.Ns, self.Gs = zip(*map(np.shape, self.YTs))
 	self.GG = max(self.Gs)
 	self.Es = [

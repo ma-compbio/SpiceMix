@@ -296,10 +296,10 @@ def estimateParametersX(self, iiter):
 							# torch.manual_seed(iiter)
 							if iiter > 1 or __t__ > 100:
 								# tlogZ = integrateOfExponentialOverSimplexSampling(teta, requires_grad=requires_grad, seed=iiter*max_iter+__t__)
-								tlogZ = integrateOfExponentialOverSimplexInduction2(teta, grad=c, requires_grad=requires_grad, )
+								tlogZ = integrateOfExponentialOverSimplexInduction2(teta, grad=c, requires_grad=requires_grad, device=device)
 							else:
 								# tlogZ = integrateOfExponentialOverSimplexSampling(teta, requires_grad=requires_grad, seed=iiter*max_iter+__t__)
-								tlogZ = integrateOfExponentialOverSimplexInduction2(teta, grad=c, requires_grad=requires_grad)
+								tlogZ = integrateOfExponentialOverSimplexInduction2(teta, grad=c, requires_grad=requires_grad, device=device)
 							if requires_grad:
 								func_grad = func_grad.add(beta*c, tlogZ.sum())
 							else:
