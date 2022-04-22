@@ -1,4 +1,4 @@
-We have updated our paper in [biorxiv](https://www.biorxiv.org/content/10.1101/2020.11.29.383067v3）
+We have updated our paper in biorxiv https://www.biorxiv.org/content/10.1101/2020.11.29.383067v3
 
 # SpiceMix
 
