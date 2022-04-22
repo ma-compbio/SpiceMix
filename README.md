@@ -1,3 +1,5 @@
+We have updated our paper in [biorxiv](https://www.biorxiv.org/content/10.1101/2020.11.29.383067v3）
+
 # SpiceMix
 
 ![overview](./SpiceMix_overview.png)
@@ -33,7 +35,7 @@ All code is contained within the SpiceMix folder. The script `main.py` runs the 
 
 All files for one run of SpiceMix must be put into one directory. SpiceMix can be applied to multiple samples (or replicates, or fields-of-view (FOV)) simultaneously, learning shared parameters across samples (we use the term FOV for an independent sample). For each FOV with name `<FOV>` of `N` cells and `G` genes, the following two files stored as tab-delimited txt format are required for SpiceMix:
 
-- `expression_<FOV>_<expr_suffix>.txt`, an N-by-G nonnegative-valued matrix of normalized single-cell expression profiles. In our paper, we applied the following steps of normalization to all data sets:
+- `expression_<FOV>_<expr_suffix>.txt`, an `N`-by-`G` nonnegative-valued matrix of normalized single-cell expression profiles. In our paper, we applied the following steps of normalization to all data sets:
   - Filter out genes with low nonzero rates and/or cells that express only a few genes
   - Log transformation: Let <img src="https://render.githubusercontent.com/render/math?math=E_{ig}"> be the read counts of gene `g` in cell `i`, and the number of counts after log transformation is ![formula](https://render.githubusercontent.com/render/math?math=E'_{ig}=\log(1%2B10^4\cdot%20E_{ij}/\sum_{g'=1}^GE_{ig'}))
 - `neighborhood_<FOV>_<neigh_suffix>.txt`, a neighbor graph represented as a list of cell pairs, i.e., an `|E|`-by-2 integer-valued matrix, where `|E|` is the number of edges in the graph. Cells are assigned with integer indices starting from 0 in the order that they appear in the expression profile file. We recommend the following two methods to generate the neighbor graph from cells' spatial coordinates:
@@ -107,7 +109,7 @@ SpiceMix requires a few arguments to specify the input files and hyperparameters
 #### Input related parameters
 | params | type | description | example |
 |-|-|-|-|
-| --path2dataset      | str | path to the dataset | "simulation 1" or "../datasets/mouse primary visual cortex" |
+| --path2dataset      | str | path to the dataset | "../data/simulation 1" or "../data/synthetic_cortex" |
 | --neighbor_suffix   | str | suffix of the name of the file that contains interacting cell pairs | "", "KNN", or "Delaunay" |
 | --expression_suffix | str | suffix of the name of the file that contains expressions | "", "allgenes", or "top100genes" |
 | --repli_list        | list of strings (Python expression)  | A Python expression of a list of FOV names | "[0,1,2]", "[A,B]", or "range(3)" |
@@ -163,11 +165,11 @@ The output of one SpiceMix run is saved in an HDF5 file in the `results` directo
   - `hyperparameters/repli_list`: the list of replicate names.
 - `progress`: Criterion of convergence. Currently, only one indicator of convergence is implemented:
   - `progress/Q/{i}`: the Q-value after the `i`th iteration, which is the negative logarithm of the joint probability.
-- `latent_states`: Latent states, currently including `X` only.
+- `latent_states`: Latent states, currently only including `X` for each FOV.
   - `latent_states/XT/{repli_name}/{i}`: an N-by-K matrix containing the latent states in replicate `<repli_name>` after iteration `i`.
 - `parameters`: Model parameters:
-  - `parameters/M/{i}`: a G-by-K matrix containing the metagenes after iteration `i`;
-  - `parameters/Sigma_x_inv/{i}`: a K-by-K matrix containing the affinity matrix after iteration `i`;
+  - `parameters/M/{i}`: a `G`-by-`K` matrix containing the metagenes after iteration `i`;
+  - `parameters/Sigma_x_inv/{i}`: a `K`-by-`K` matrix containing the affinity matrix `Sigma_x^{-1}` after iteration `i`;
   - `parameters/sigma_yx_invs/{repli_name}/{i}`: the value of the reciprocal estimated reconstruction error in replicate `<repli_name>` after iteration `i`.
 
 ## Cite
@@ -176,12 +178,14 @@ Cite our paper by
 
 ```
 @article{chidester2020spicemix,
-  title={SPICEMIX: Integrative single-cell spatial modeling for inferring cell identity},
-  author={Chidester, Benjamin and Zhou, Tianming and Ma, Jian},
-  journal={bioRxiv},
-  year={2020},
-  publisher={Cold Spring Harbor Laboratory}
+	author = {Chidester, Benjamin and Zhou, Tianming and Alam, Shahul and Ma, Jian},
+	title = {SPICEMIX: Integrative single-cell spatial modeling of cell identity},
+	year = {2022},
+	doi = {10.1101/2020.11.29.383067},
+	publisher = {Cold Spring Harbor Laboratory},
+	journal = {bioRxiv}
 }
+
 ```
 
 ![paper](./paper.png)
