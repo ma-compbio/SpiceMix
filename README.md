@@ -174,7 +174,7 @@ The output of one SpiceMix run is saved in an HDF5 file in the `results` directo
   - `parameters/Sigma_x_inv/{i}`: a `K`-by-`K` matrix containing the affinity matrix `Sigma_x^{-1}` after iteration `i`;
   - `parameters/sigma_yx_invs/{repli_name}/{i}`: the value of the reciprocal estimated reconstruction error in replicate `<repli_name>` after iteration `i`.
 
-## Cite
+# Cite
 
 Cite our paper by
 
@@ -191,3 +191,7 @@ Cite our paper by
 ```
 
 ![paper](./paper.png)
+
+# Contact
+
+Please contact tianming@andrew.cmu.edu or raise an issue in the github repo with any questions about installation or usage.
