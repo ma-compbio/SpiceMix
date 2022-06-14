@@ -22,7 +22,7 @@ Python package dependencies:
 - scikit-learn
 - h5py
 
-An environment file for Anaconda can be found [here](./SpiceMix.yml). A Anaconda environment can be set up with the following command
+An environment file for Anaconda can be found [here](./SpiceMix.yml). An Anaconda environment can be set up with the following command
 ```
 conda env create -f SpiceMix.yml
 ```
