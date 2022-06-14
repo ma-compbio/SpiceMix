@@ -14,13 +14,18 @@ SpiceMix can be applied to any type of spatial transcriptomics data, including M
 
 Python package dependencies:
 
-- Python=3.7.3
-- scipy=1.2.1
+- Python
+- scipy
 - gurobi=8.1.1
 - pytorch=1.4.0
-- numpy=1.16.2
-- scikit-learn=0.21.1
-- h5py=3.1.0
+- numpy
+- scikit-learn
+- h5py
+
+An environment file for Anaconda can be found [here](./SpiceMix.yml). A Anaconda environment can be set up with the following command
+```
+conda env create -f SpiceMix.yml
+```
 
 Computing resources:
 
@@ -28,6 +33,14 @@ Computing resources:
 - 8 GB RAM
 - < 100M storage per run
 - GPU (optional)
+
+### Using GPU
+
+If you plan to use GPU, you will need to install the GPU version of PyTorch. You may follow instruction posted [here]([./SpiceMix.yml](https://pytorch.org/get-started/locally/). Note that SpiceMix was developed based on an old version of PyTorch (1.4.0), and some APIs may not be compatible with the newest release of PyTorch.
+
+### Using GurobiPy
+
+Gurobi is a commercial and outstanding package. It is used to solve quadratic programmings in SpiceMix. To use it, you will need to have a license, which can be requested on [their website](https://www.gurobi.com/).
 
 ## Running SpiceMix
 
