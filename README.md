@@ -36,7 +36,7 @@ Computing resources:
 
 ### Using GPU
 
-If you plan to use GPU, you will need to install the GPU version of PyTorch. You may follow instruction posted [here]([./SpiceMix.yml](https://pytorch.org/get-started/locally/). Note that SpiceMix was developed based on an old version of PyTorch (1.4.0), and some APIs may not be compatible with the newest release of PyTorch.
+If you plan to use GPU, you will need to install the GPU version of PyTorch. You may follow instruction posted [here](https://pytorch.org/get-started/locally/). Note that SpiceMix was developed based on an old version of PyTorch (1.4.0), and some APIs may not be compatible with the newest release of PyTorch.
 
 ### Using GurobiPy
 
