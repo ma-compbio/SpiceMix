@@ -186,6 +186,11 @@ The output of one SpiceMix run is saved in an HDF5 file in the `results` directo
   - `parameters/M/{i}`: a `G`-by-`K` matrix containing the metagenes after iteration `i`;
   - `parameters/Sigma_x_inv/{i}`: a `K`-by-`K` matrix containing the affinity matrix `Sigma_x^{-1}` after iteration `i`;
 
+## Empirical runtime
+
+- On a synthetic dataset, SpiceMix takes 6~30 minutes for 200 iterations, depending on the difficulty.
+- On the Visium dataset (Maynard 2021), SpiceMix takes 100 minutes for 200 iterations.
+
 # Cite
 
 Cite our paper by
