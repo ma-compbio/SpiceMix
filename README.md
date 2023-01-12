@@ -1,4 +1,4 @@
-Our paper is now officially published in [___Nature Genetics___](https://doi.org/10.1038/s41588-022-01256-z)
+Our paper is now officially published in [___Nature Genetics___](https://doi.org/10.1038/s41588-022-01256-z).
 
 # Overview of SpiceMix
 
