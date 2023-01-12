@@ -196,13 +196,14 @@ The output of one SpiceMix run is saved in an HDF5 file in the `results` directo
 Cite our paper by
 
 ```
-@article{chidester2020spicemix,
-	author = {Chidester, Benjamin and Zhou, Tianming and Alam, Shahul and Ma, Jian},
-	title = {SPICEMIX: Integrative single-cell spatial modeling of cell identity},
-	year = {2022},
-	doi = {10.1101/2020.11.29.383067},
-	publisher = {Cold Spring Harbor Laboratory},
-	journal = {bioRxiv}
+@article{chidester2023spicemix,
+  title={SpiceMix enables integrative single-cell spatial modeling of cell identity},
+  author={Chidester, Benjamin and Zhou, Tianming and Alam, Shahul and Ma, Jian},
+  journal={Nature Genetics},
+  pages={1--11},
+  year={2023},
+  publisher={Nature Publishing Group},
+  doi={https://doi.org/10.1038/s41588-022-01256-z},
 }
 
 ```
