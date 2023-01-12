@@ -1,6 +1,4 @@
-# We have updated our paper in biorxiv
-
-See https://www.biorxiv.org/content/10.1101/2020.11.29.383067v3
+Our paper is now officially published in [___Nature Genetics___](https://doi.org/10.1038/s41588-022-01256-z)
 
 # Overview of SpiceMix
 
