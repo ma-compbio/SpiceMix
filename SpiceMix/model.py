@@ -24,6 +24,10 @@ class SpiceMix:
 	):
 		if context is None: context = dict(device='cpu', dtype=torch.float32)
 		if context_Y is None: context_Y = context
+		context.setdefault('device', 'cpu')
+		context_Y.setdefault('device', 'cpu')
+		if context['device'] != 'cpu':
+			torch.cuda.set_device(context['device'])
 		self.context = context
 		self.context_Y = context_Y
 		self.repli_list = repli_list
@@ -85,7 +89,7 @@ class SpiceMix:
 		self.Ys = [G / self.GG * self.K * Y / Y.sum(1).mean() for Y, G in zip(self.Ys, self.Gs)]
 		self.Ys = [
 			torch.tensor(Y, **self.context_Y).pin_memory()
-			if self.context_Y.get('device', 'cpu') == 'cpu' else
+			if self.context['device'] != 'cpu' and self.context_Y['device'] == 'cpu' else
 			torch.tensor(Y, **self.context_Y)
 			for Y in self.Ys
 		]
