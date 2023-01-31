@@ -150,6 +150,8 @@ SpiceMix requires a few arguments to specify the input files and hyperparameters
 | --result_filename | str | the name of the hdf5 file that stores inferred parameters | "../data/simulation 1/results/SpiceMix.h5" |
 
 #### Examples
+[This notebook](./SpiceMix/main_Maynard2021.ipynb) shows how to run SpiceMinx via command line (part 1.1) and through a notebook (part 1.2).
+
 The following command runs SpiceMix on FOVs 1 and 3 from dataset `simulation 1` with `K=20` metagenes and the spatial information of both FOVs are used:
 ```
 python main.py -K=20 --path2dataset="path/to/simulation 1" --repli_list="[1,3]" --use_spatial="[True]*2" --result_filename="path/to/simulation 1/results/SpiceMix_K20_FOV13.h5"
